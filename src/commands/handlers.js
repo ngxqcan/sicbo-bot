@@ -321,5 +321,6 @@ module.exports = {
   handleStats,
   handleGive,
   handleAdmin,
+  handlePrefixAdmin,
   autoChannels,
 };
