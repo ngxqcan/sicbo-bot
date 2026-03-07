@@ -1,9 +1,9 @@
 'use strict';
 
-// Dice emoji for visual display
-const DICE_EMOJI = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+// Custom dice emoji của server
+const DICE_EMOJI = ['', '<:dice1:1479932375097016523>', '<:dice2:1479932557905891551>', '<:dice3:1479932509893431296>', '<:dice4:1479932287771738238>', '<:dice5:1479932197254205441>', '<:dice6:1479932432806445138>'];
 const BET_TYPES = { TAI: 'TAI', XIU: 'XIU', TRIPLE: 'TRIPLE' };
-const BET_LABELS = { TAI: '🔴 Tài (Big)', XIU: '🔵 Xỉu (Small)', TRIPLE: '⭐ Any Triple' };
+const BET_LABELS = { TAI: '🔴 Tài', XIU: '🔵 Xỉu', TRIPLE: '⭐ Triple' };
 
 const PAYOUTS = {
   TAI: () => parseInt(process.env.PAYOUT_TAI || '2'),
@@ -62,16 +62,16 @@ function formatDice(dice) {
 
 function formatRoundResult(dice, rollResult) {
   const lines = [
-    `**Dice:** ${formatDice(dice)}  (**${rollResult.total}**)`,
+    `**Xúc xắc:** ${formatDice(dice)}  (**${rollResult.total}**)`,
     '',
   ];
 
   if (rollResult.isTriple) {
-    lines.push(`🎲 **TRIPLE ${DICE_EMOJI[dice[0]]}${DICE_EMOJI[dice[0]]}${DICE_EMOJI[dice[0]]}!** House takes all Tài/Xỉu bets!`);
+    lines.push(`⭐ **TRIPLE!** ${DICE_EMOJI[dice[0]]}${DICE_EMOJI[dice[0]]}${DICE_EMOJI[dice[0]]} — Tài/Xỉu thua hết!`);
   } else if (rollResult.isTai) {
-    lines.push(`🔴 **TÀI (BIG)** — Total ${rollResult.total} ≥ 11`);
+    lines.push(`🔴 **TÀI** — Tổng ${rollResult.total} ≥ 11`);
   } else {
-    lines.push(`🔵 **XỈU (SMALL)** — Total ${rollResult.total} ≤ 10`);
+    lines.push(`🔵 **XỈU** — Tổng ${rollResult.total} ≤ 10`);
   }
 
   return lines.join('\n');

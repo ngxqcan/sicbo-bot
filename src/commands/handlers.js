@@ -320,7 +320,7 @@ async function handleAdmin(interaction) {
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
       roundManager.forceResult = result;
-      const labelMap = { TAI: '🔴 Tài (Big)', XIU: '🔵 Xỉu (Small)', TRIPLE: '⭐ Triple' };
+      const labelMap = { TAI: '🔴 Tài', XIU: '🔵 Xỉu', TRIPLE: '⭐ Triple' };
       const colorMap = { TAI: 0xFF3333, XIU: 0x3399FF, TRIPLE: 0xAA00FF };
       const embed = new EmbedBuilder()
         .setColor(colorMap[result])

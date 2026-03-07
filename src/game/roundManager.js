@@ -51,8 +51,8 @@ class RoundManager {
         {
           name: '📋 Loại Cược & Tỉ Lệ',
           value: [
-            `🔴 **Tài (Big)** — Tổng 11–17 · Thắng **1:1**`,
-            `🔵 **Xỉu (Small)** — Tổng 4–10 · Thắng **1:1**`,
+            `🔴 **Tài** — Tổng 11–17 · Thắng **1:1**`,
+            `🔵 **Xỉu** — Tổng 4–10 · Thắng **1:1**`,
             `⭐ **Triple** — 3 xúc xắc giống nhau · Thắng **24:1**`,
             `⚠️ Ra Triple → Tài/Xỉu thua hết!`,
           ].join('\n'),
@@ -78,13 +78,13 @@ class RoundManager {
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('betmodal_TAI')
-        .setLabel('Tài (Big)')
+        .setLabel('Tài')
         .setStyle(ButtonStyle.Danger)
         .setEmoji('🔴')
         .setDisabled(disabled),
       new ButtonBuilder()
         .setCustomId('betmodal_XIU')
-        .setLabel('Xỉu (Small)')
+        .setLabel('Xỉu')
         .setStyle(ButtonStyle.Primary)
         .setEmoji('🔵')
         .setDisabled(disabled),
@@ -104,7 +104,7 @@ class RoundManager {
       return interaction.reply({ content: '❌ Không có ván nào đang chạy!', ephemeral: true });
     }
 
-    const labelMap = { TAI: 'Tài (Big)', XIU: 'Xỉu (Small)', TRIPLE: 'Triple' };
+    const labelMap = { TAI: 'Tài', XIU: 'Xỉu', TRIPLE: 'Triple' };
 
     const modal = new ModalBuilder()
       .setCustomId(`betsubmit_${betType}`)
@@ -297,10 +297,10 @@ class RoundManager {
       resultDesc = `✨ Ba xúc xắc giống nhau! Tất cả Tài/Xỉu đều thua!
 **Tổng: ${rollResult.total}**`;
     } else if (rollResult.isTai) {
-      resultTitle = `🔴 TÀI (BIG) — Tổng ${rollResult.total}`;
+      resultTitle = `🔴 TÀI — Tổng ${rollResult.total}`;
       resultDesc = `Tổng **${rollResult.total}** ≥ 11 → **TÀI thắng!**`;
     } else {
-      resultTitle = `🔵 XỈU (SMALL) — Tổng ${rollResult.total}`;
+      resultTitle = `🔵 XỈU — Tổng ${rollResult.total}`;
       resultDesc = `Tổng **${rollResult.total}** ≤ 10 → **XỈU thắng!**`;
     }
 
