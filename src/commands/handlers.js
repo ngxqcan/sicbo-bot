@@ -306,6 +306,33 @@ async function handleAdmin(interaction) {
       return interaction.reply({ embeds: [embed], ephemeral: true });
     }
 
+    case 'setresult': {
+      const result = interaction.options.getString('result');
+      const roundManager = require('../game/roundManager');
+      if (result === 'RANDOM') {
+        roundManager.forceResult = null;
+        const embed = new EmbedBuilder()
+          .setColor(0x95a5a6)
+          .setTitle('🎲 Admin · Bỏ Can Thiệp')
+          .setDescription('Ván tiếp theo sẽ **ngẫu nhiên** bình thường.')
+          .setFooter({ text: `Thực hiện bởi ${interaction.user.username}` })
+          .setTimestamp();
+        return interaction.reply({ embeds: [embed], ephemeral: true });
+      }
+      roundManager.forceResult = result;
+      const labelMap = { TAI: '🔴 Tài (Big)', XIU: '🔵 Xỉu (Small)', TRIPLE: '⭐ Triple' };
+      const colorMap = { TAI: 0xFF3333, XIU: 0x3399FF, TRIPLE: 0xAA00FF };
+      const embed = new EmbedBuilder()
+        .setColor(colorMap[result])
+        .setTitle('🎯 Admin · Can Thiệp Kết Quả')
+        .setDescription(`Ván **tiếp theo** sẽ ra: **${labelMap[result]}**
+
+⚠️ Tự động reset sau 1 ván.`)
+        .setFooter({ text: `Thực hiện bởi ${interaction.user.username}` })
+        .setTimestamp();
+      return interaction.reply({ embeds: [embed], ephemeral: true });
+    }
+
     default:
       return interaction.reply({ content: '❓ Subcommand không hợp lệ.', ephemeral: true });
   }

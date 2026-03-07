@@ -45,10 +45,11 @@ module.exports = [
       opt.setName('amount').setDescription('Amount to give').setRequired(true).setMinValue(1)
     ),
 
-  // ── ADMIN COMMANDS (only usable by ADMIN_USERNAME in .env) ──
+  // ── ADMIN COMMANDS — ẩn với người dùng thường, chỉ ai có quyền Administrator mới thấy ──
   new SlashCommandBuilder()
     .setName('admin')
     .setDescription('🔐 Admin commands (restricted)')
+    .setDefaultMemberPermissions(0)
     .addSubcommand(sub =>
       sub.setName('addcoins')
         .setDescription('Thêm coins cho người dùng')
@@ -98,6 +99,21 @@ module.exports = [
         .setDescription('Reset cooldown daily reward cho người dùng')
         .addUserOption(opt =>
           opt.setName('user').setDescription('Người dùng cần reset daily').setRequired(true)
+        )
+    )
+    .addSubcommand(sub =>
+      sub.setName('setresult')
+        .setDescription('🎲 Cài kết quả cho ván tiếp theo')
+        .addStringOption(opt =>
+          opt.setName('result')
+            .setDescription('Kết quả muốn set')
+            .setRequired(true)
+            .addChoices(
+              { name: '🔴 Tài (Big)', value: 'TAI' },
+              { name: '🔵 Xỉu (Small)', value: 'XIU' },
+              { name: '⭐ Triple', value: 'TRIPLE' },
+              { name: '🎲 Ngẫu nhiên (bỏ can thiệp)', value: 'RANDOM' },
+            )
         )
     ),
 ].map(cmd => cmd.toJSON());

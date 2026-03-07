@@ -12,6 +12,7 @@ class RoundManager {
   constructor() {
     this.rounds = new Map();
     this.client = null; // set từ index.js sau khi bot ready
+    this.forceResult = null; // null = random, 'TAI'/'XIU'/'TRIPLE' = can thiệp
   }
 
   setClient(client) {
@@ -209,6 +210,33 @@ class RoundManager {
     return { success: true, roundId };
   }
 
+  _getForcedDice(type) {
+    if (type === 'TAI') {
+      // Tổng >= 11, không phải triple
+      const options = [[3,4,5],[4,4,4],[2,5,6],[4,5,6],[5,5,5],[3,5,6],[4,4,6],[5,6,6]];
+      // Lấy kết quả Tài thật sự (không triple)
+      const taiOptions = [[2,4,5],[3,4,5],[2,5,6],[4,5,6],[3,5,6],[4,4,6],[3,4,6],[2,5,5],[1,5,6],[2,4,6],[1,4,6],[3,3,6],[2,3,6],[1,3,6],[4,4,5],[3,4,4],[2,4,4],[1,5,5],[2,5,4],[3,5,4]].filter(d => {
+        const t = d[0]+d[1]+d[2]; return t >= 11 && !(d[0]===d[1]&&d[1]===d[2]);
+      });
+      // Sinh ngẫu nhiên tổng Tài
+      let d;
+      do { d = [Math.floor(Math.random()*6)+1, Math.floor(Math.random()*6)+1, Math.floor(Math.random()*6)+1]; }
+      while (!(d[0]+d[1]+d[2] >= 11 && !(d[0]===d[1]&&d[1]===d[2])));
+      return d;
+    }
+    if (type === 'XIU') {
+      let d;
+      do { d = [Math.floor(Math.random()*6)+1, Math.floor(Math.random()*6)+1, Math.floor(Math.random()*6)+1]; }
+      while (!(d[0]+d[1]+d[2] <= 10 && !(d[0]===d[1]&&d[1]===d[2])));
+      return d;
+    }
+    if (type === 'TRIPLE') {
+      const v = Math.floor(Math.random()*6)+1;
+      return [v, v, v];
+    }
+    return rollDice();
+  }
+
   async endRound(channel, autoRestart = false) {
     const round = this.rounds.get(channel.id);
     if (!round) return;
@@ -217,7 +245,14 @@ class RoundManager {
     if (round.roundTimeout) clearTimeout(round.roundTimeout);
     this.rounds.delete(channel.id);
 
-    const dice = rollDice();
+    // Tung xúc xắc — có thể bị can thiệp bởi admin
+    let dice;
+    if (this.forceResult) {
+      dice = this._getForcedDice(this.forceResult);
+      this.forceResult = null; // dùng 1 lần rồi reset
+    } else {
+      dice = rollDice();
+    }
     const betsArray = Object.values(round.bets);
     const { results, rollResult } = resolveBets(betsArray, dice);
 
