@@ -189,172 +189,21 @@ async function handleAdmin(interaction) {
     });
   }
 
-  const sub = interaction.options.getSubcommand(false);
-
-  if (!sub) {
-    const embed = new EmbedBuilder()
-      .setColor(0x5865F2)
-      .setTitle('🔐 Admin · Danh Sách Lệnh')
-      .setDescription([
-        '`/admin addcoins` — Thêm coins cho người dùng',
-        '`/admin removecoins` — Xoá coins của người dùng',
-        '`/admin setcoins` — Đặt số coins cụ thể',
-        '`/admin resetbalance` — Reset số dư về mặc định',
-        '`/admin checkuser` — Xem thông tin chi tiết người dùng',
-        '`/admin resetdaily` — Reset daily reward',
-        '`/admin setresult` — Can thiệp kết quả ván tiếp theo',
-      ].join('\n'))
-      .setFooter({ text: 'Chỉ admin mới thấy và dùng được lệnh này' })
-      .setTimestamp();
-    return interaction.reply({ embeds: [embed], flags: 64 });
-  }
-
-  const target = interaction.options.getUser('user');
-  const amount = interaction.options.getInteger('amount');
-
-  switch (sub) {
-    case 'addcoins': {
-      getPlayer(target.id, target.username); // ensure exists
-      adjustBalance(target.id, amount);
-      const after = getPlayer(target.id, target.username);
-      const embed = new EmbedBuilder()
-        .setColor(0x00FF00)
-        .setTitle('✅ Admin · Thêm Coins')
-        .addFields(
-          { name: '👤 Người nhận', value: `<@${target.id}> (\`${target.username}\`)`, inline: true },
-          { name: '➕ Thêm', value: `**+${amount.toLocaleString()}** coins`, inline: true },
-          { name: '💳 Số dư mới', value: `**${after.balance.toLocaleString()}** coins`, inline: true },
-        )
-        .setFooter({ text: `Thực hiện bởi ${interaction.user.username}` })
-        .setTimestamp();
-      return interaction.reply({ embeds: [embed], flags: 64 });
-    }
-
-    case 'removecoins': {
-      const player = getPlayer(target.id, target.username);
-      const deduct = Math.min(amount, player.balance); // không trừ âm
-      adjustBalance(target.id, -deduct);
-      const after = getPlayer(target.id, target.username);
-      const embed = new EmbedBuilder()
-        .setColor(0xFF4444)
-        .setTitle('✅ Admin · Xoá Coins')
-        .addFields(
-          { name: '👤 Người dùng', value: `<@${target.id}> (\`${target.username}\`)`, inline: true },
-          { name: '➖ Trừ', value: `**-${deduct.toLocaleString()}** coins`, inline: true },
-          { name: '💳 Số dư mới', value: `**${after.balance.toLocaleString()}** coins`, inline: true },
-        )
-        .setFooter({ text: `Thực hiện bởi ${interaction.user.username}` })
-        .setTimestamp();
-      return interaction.reply({ embeds: [embed], flags: 64 });
-    }
-
-    case 'setcoins': {
-      getPlayer(target.id, target.username);
-      db.prepare('UPDATE players SET balance = ? WHERE user_id = ?').run(amount, target.id);
-      const embed = new EmbedBuilder()
-        .setColor(0xFFD700)
-        .setTitle('✅ Admin · Đặt Coins')
-        .addFields(
-          { name: '👤 Người dùng', value: `<@${target.id}> (\`${target.username}\`)`, inline: true },
-          { name: '💳 Số dư mới', value: `**${amount.toLocaleString()}** coins`, inline: true },
-        )
-        .setFooter({ text: `Thực hiện bởi ${interaction.user.username}` })
-        .setTimestamp();
-      return interaction.reply({ embeds: [embed], flags: 64 });
-    }
-
-    case 'resetbalance': {
-      const startBalance = parseInt(process.env.STARTING_BALANCE || '1000');
-      getPlayer(target.id, target.username);
-      db.prepare('UPDATE players SET balance = ? WHERE user_id = ?').run(startBalance, target.id);
-      const embed = new EmbedBuilder()
-        .setColor(0xFFAA00)
-        .setTitle('✅ Admin · Reset Số Dư')
-        .addFields(
-          { name: '👤 Người dùng', value: `<@${target.id}> (\`${target.username}\`)`, inline: true },
-          { name: '💳 Số dư reset', value: `**${startBalance.toLocaleString()}** coins`, inline: true },
-        )
-        .setFooter({ text: `Thực hiện bởi ${interaction.user.username}` })
-        .setTimestamp();
-      return interaction.reply({ embeds: [embed], flags: 64 });
-    }
-
-    case 'checkuser': {
-      const player = getPlayer(target.id, target.username);
-      if (!player) {
-        return interaction.reply({ content: `❌ Người dùng <@${target.id}> chưa chơi bao giờ.`, flags: 64 });
-      }
-      const winRate = player.games_played > 0
-        ? ((player.total_won / (player.total_won + player.total_lost)) * 100).toFixed(1)
-        : '0.0';
-      const net = player.total_won - player.total_lost;
-      const lastDaily = player.last_daily
-        ? `<t:${player.last_daily}:R>`
-        : '*Chưa nhận*';
-      const joined = `<t:${player.created_at}:D>`;
-
-      const embed = new EmbedBuilder()
-        .setColor(0x5865F2)
-        .setTitle(`🔍 Admin · Thông Tin Người Dùng`)
-        .setDescription(`<@${target.id}> (\`${target.username}\`)`)
-        .addFields(
-          { name: '💳 Số dư', value: `${player.balance.toLocaleString()} coins`, inline: true },
-          { name: '🎮 Số ván', value: `${player.games_played.toLocaleString()}`, inline: true },
-          { name: '📈 Win Rate', value: `${winRate}%`, inline: true },
-          { name: '✅ Tổng thắng', value: `${player.total_won.toLocaleString()} coins`, inline: true },
-          { name: '❌ Tổng thua', value: `${player.total_lost.toLocaleString()} coins`, inline: true },
-          { name: `${net >= 0 ? '🟢' : '🔴'} Net`, value: `${net >= 0 ? '+' : ''}${net.toLocaleString()} coins`, inline: true },
-          { name: '🎁 Daily gần nhất', value: lastDaily, inline: true },
-          { name: '📅 Tham gia', value: joined, inline: true },
-        )
-        .setThumbnail(target.displayAvatarURL())
-        .setFooter({ text: `ID: ${target.id}` })
-        .setTimestamp();
-      return interaction.reply({ embeds: [embed], flags: 64 });
-    }
-
-    case 'resetdaily': {
-      getPlayer(target.id, target.username);
-      db.prepare('UPDATE players SET last_daily = NULL WHERE user_id = ?').run(target.id);
-      const embed = new EmbedBuilder()
-        .setColor(0x00FFAA)
-        .setTitle('✅ Admin · Reset Daily')
-        .setDescription(`<@${target.id}> có thể nhận daily reward ngay bây giờ!`)
-        .setFooter({ text: `Thực hiện bởi ${interaction.user.username}` })
-        .setTimestamp();
-      return interaction.reply({ embeds: [embed], flags: 64 });
-    }
-
-    case 'setresult': {
-      const result = interaction.options.getString('result');
-      const roundManager = require('../game/roundManager');
-      if (result === 'RANDOM') {
-        roundManager.forceResult = null;
-        const embed = new EmbedBuilder()
-          .setColor(0x95a5a6)
-          .setTitle('🎲 Admin · Bỏ Can Thiệp')
-          .setDescription('Ván tiếp theo sẽ **ngẫu nhiên** bình thường.')
-          .setFooter({ text: `Thực hiện bởi ${interaction.user.username}` })
-          .setTimestamp();
-        return interaction.reply({ embeds: [embed], flags: 64 });
-      }
-      roundManager.forceResult = result;
-      const labelMap = { TAI: '🔴 Tài', XIU: '🔵 Xỉu', TRIPLE: '⭐ Triple' };
-      const colorMap = { TAI: 0xFF3333, XIU: 0x3399FF, TRIPLE: 0xAA00FF };
-      const embed = new EmbedBuilder()
-        .setColor(colorMap[result])
-        .setTitle('🎯 Admin · Can Thiệp Kết Quả')
-        .setDescription(`Ván **tiếp theo** sẽ ra: **${labelMap[result]}**
-
-⚠️ Tự động reset sau 1 ván.`)
-        .setFooter({ text: `Thực hiện bởi ${interaction.user.username}` })
-        .setTimestamp();
-      return interaction.reply({ embeds: [embed], flags: 64 });
-    }
-
-    default:
-      return interaction.reply({ content: '❓ Subcommand không hợp lệ.', flags: 64 });
-  }
+  const embed = new EmbedBuilder()
+    .setColor(0x5865F2)
+    .setTitle('🔐 Admin · Danh Sách Lệnh')
+    .setDescription([
+      '`!addcoins @user <số>` — Thêm coins',
+      '`!removecoins @user <số>` — Xoá coins',
+      '`!setcoins @user <số>` — Đặt số coins cụ thể',
+      '`!resetbalance @user` — Reset về mặc định',
+      '`!checkuser @user` — Xem thông tin người dùng',
+      '`!resetdaily @user` — Reset daily reward',
+      '`!setresult tai|xiu|triple|random` — Can thiệp kết quả',
+    ].join('\n'))
+    .setFooter({ text: 'Dùng prefix ! — không hiển thị trong autocomplete với người thường' })
+    .setTimestamp();
+  return interaction.reply({ embeds: [embed], flags: 64 });
 }
 
 // ── PREFIX COMMANDS (!lệnh) — chỉ admin thấy và dùng ──────────────────────
