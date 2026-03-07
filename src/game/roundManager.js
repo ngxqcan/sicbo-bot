@@ -173,7 +173,7 @@ class RoundManager {
     });
   }
 
-  async startRound(channel, autoRestart = false) {
+  async startRound(channel, autoRestart = false, reuseMessage = null) {
     if (this.rounds.has(channel.id)) {
       return { error: 'Đang có ván chạy trong kênh này rồi!' };
     }
@@ -187,7 +187,13 @@ class RoundManager {
 
     let message;
     try {
-      message = await channel.send({ embeds: [embed], components: buttons });
+      if (reuseMessage) {
+        // Tái sử dụng tin nhắn cũ — edit lại thay vì gửi mới
+        await reuseMessage.edit({ embeds: [embed], components: buttons });
+        message = reuseMessage;
+      } else {
+        message = await channel.send({ embeds: [embed], components: buttons });
+      }
     } catch (err) {
       return { error: `Không gửi được tin nhắn: ${err.message}` };
     }
@@ -346,7 +352,8 @@ class RoundManager {
     }, 10000);
 
     if (autoRestart) {
-      setTimeout(() => this.startRound(channel, true), 5000);
+      const oldMessage = round.message;
+      setTimeout(() => this.startRound(channel, true, oldMessage), 5000);
     }
   }
 }
