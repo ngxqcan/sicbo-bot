@@ -25,6 +25,7 @@ const client = new Client({
 });
 
 client.once(Events.ClientReady, () => {
+  roundManager.setClient(client); // truyền client để lấy avatar bot
   console.log(`✅ Logged in as ${client.user.tag}`);
   console.log(`🎲 Sic Bo Bot is ready! Serving ${client.guilds.cache.size} guild(s).`);
   client.user.setActivity('🎲 Tài Xỉu | /sicbo start');

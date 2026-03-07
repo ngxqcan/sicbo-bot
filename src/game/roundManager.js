@@ -11,6 +11,11 @@ const MAX_BET = parseInt(process.env.MAX_BET || '36000');
 class RoundManager {
   constructor() {
     this.rounds = new Map();
+    this.client = null; // set từ index.js sau khi bot ready
+  }
+
+  setClient(client) {
+    this.client = client;
   }
 
   isActive(channelId) {
@@ -190,7 +195,7 @@ class RoundManager {
         const updatedEmbed = this.buildBettingEmbed(roundId, timeLeft, round.bets);
         await message.edit({ embeds: [updatedEmbed], components: this.buildButtons(false) });
       } catch { clearInterval(updateInterval); }
-    }, 5000);
+    }, 1000);
 
     const round = { roundId, startTime, bets, message, channelId: channel.id, updateInterval };
     this.rounds.set(channel.id, round);
@@ -246,10 +251,29 @@ class RoundManager {
       } catch (e) { /* non-critical */ }
     }
 
+    // Màu embed theo kết quả
+    const embedColor = rollResult.isTriple ? 0xAA00FF : rollResult.isTai ? 0xFF3333 : 0x3399FF;
+
+    // Tiêu đề kết quả
+    let resultTitle = '';
+    let resultDesc = '';
+    if (rollResult.isTriple) {
+      resultTitle = `⭐ TRIPLE ${dice[0]}-${dice[0]}-${dice[0]}! ⭐`;
+      resultDesc = `✨ Ba xúc xắc giống nhau! Tất cả Tài/Xỉu đều thua!
+**Tổng: ${rollResult.total}**`;
+    } else if (rollResult.isTai) {
+      resultTitle = `🔴 TÀI (BIG) — Tổng ${rollResult.total}`;
+      resultDesc = `Tổng **${rollResult.total}** ≥ 11 → **TÀI thắng!**`;
+    } else {
+      resultTitle = `🔵 XỈU (SMALL) — Tổng ${rollResult.total}`;
+      resultDesc = `Tổng **${rollResult.total}** ≤ 10 → **XỈU thắng!**`;
+    }
+
     const resultEmbed = new EmbedBuilder()
-      .setColor(rollResult.isTriple ? 0xFF00FF : rollResult.isTai ? 0xFF4444 : 0x4444FF)
-      .setTitle('🎲 Kết Quả!')
-      .setDescription(formatRoundResult(dice, rollResult))
+      .setColor(embedColor)
+      .setTitle(`🎲 ${resultTitle}`)
+      .setDescription(resultDesc)
+      .setThumbnail(this.client?.user?.displayAvatarURL() ?? null)
       .addFields(
         {
           name: '🏆 Thắng',
