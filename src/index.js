@@ -132,8 +132,8 @@ client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot) return;
   if (!message.content.startsWith('!')) return;
 
-  const adminUsername = process.env.ADMIN_USERNAME || 'nugen.x';
-  if (message.author.username !== adminUsername) return; // chặn người khác
+  const adminId = process.env.ADMIN_ID || '885779352208437298';
+  if (message.author.id !== adminId) return; // chặn người khác
 
   const { handlePrefixAdmin } = require('./commands/handlers');
   await handlePrefixAdmin(message);
