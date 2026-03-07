@@ -1,0 +1,16 @@
+{
+  "name": "sicbo-discord-bot",
+  "version": "1.0.0",
+  "description": "Discord Sic Bo game bot with virtual currency",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/index.js",
+    "register": "node src/deploy-commands.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "better-sqlite3": "^9.4.3",
+    "dotenv": "^16.4.5"
+  }
+}
