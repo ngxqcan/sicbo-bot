@@ -19,47 +19,47 @@ async function handleSicboStart(interaction) {
   const isAdmin = interaction.member?.permissions?.has(PermissionFlagsBits.ManageGuild);
   
   if (roundManager.isActive(interaction.channelId)) {
-    return interaction.reply({ content: '❌ A round is already running here! Wait for it to finish.', ephemeral: true });
+    return interaction.reply({ content: '❌ A round is already running here! Wait for it to finish.', flags: 64 });
   }
 
-  await interaction.reply({ content: '🎲 Starting a new round...', ephemeral: true });
+  await interaction.reply({ content: '🎲 Starting a new round...', flags: 64 });
 
   const auto = autoChannels.has(interaction.channelId);
   const result = await roundManager.startRound(interaction.channel, auto);
   
   if (result?.error) {
-    await interaction.followUp({ content: `❌ ${result.error}`, ephemeral: true });
+    await interaction.followUp({ content: `❌ ${result.error}`, flags: 64 });
   }
 }
 
 async function handleSicboStop(interaction) {
   const isAdmin = interaction.member?.permissions?.has(PermissionFlagsBits.ManageGuild);
   if (!isAdmin) {
-    return interaction.reply({ content: '❌ You need **Manage Server** permission to stop rounds.', ephemeral: true });
+    return interaction.reply({ content: '❌ You need **Manage Server** permission to stop rounds.', flags: 64 });
   }
 
   if (!roundManager.isActive(interaction.channelId)) {
-    return interaction.reply({ content: '❌ No active round in this channel.', ephemeral: true });
+    return interaction.reply({ content: '❌ No active round in this channel.', flags: 64 });
   }
 
   autoChannels.delete(interaction.channelId);
-  await interaction.reply({ content: '⏹️ Stopping current round...', ephemeral: true });
+  await interaction.reply({ content: '⏹️ Stopping current round...', flags: 64 });
   await roundManager.endRound(interaction.channel, false);
 }
 
 async function handleSicboAutostart(interaction) {
   const isAdmin = interaction.member?.permissions?.has(PermissionFlagsBits.ManageGuild);
   if (!isAdmin) {
-    return interaction.reply({ content: '❌ You need **Manage Server** permission to toggle auto-start.', ephemeral: true });
+    return interaction.reply({ content: '❌ You need **Manage Server** permission to toggle auto-start.', flags: 64 });
   }
 
   const channelId = interaction.channelId;
   if (autoChannels.has(channelId)) {
     autoChannels.delete(channelId);
-    return interaction.reply({ content: '🔴 Auto-restart **disabled** for this channel.', ephemeral: true });
+    return interaction.reply({ content: '🔴 Auto-restart **disabled** for this channel.', flags: 64 });
   } else {
     autoChannels.add(channelId);
-    await interaction.reply({ content: '🟢 Auto-restart **enabled**! Starting first round...', ephemeral: true });
+    await interaction.reply({ content: '🟢 Auto-restart **enabled**! Starting first round...', flags: 64 });
     if (!roundManager.isActive(channelId)) {
       await roundManager.startRound(interaction.channel, true);
     }
@@ -79,7 +79,7 @@ async function handleBalance(interaction) {
     .setThumbnail(interaction.user.displayAvatarURL())
     .setTimestamp();
   
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+  await interaction.reply({ embeds: [embed], flags: 64 });
 }
 
 async function handleDaily(interaction) {
@@ -100,10 +100,10 @@ async function handleDaily(interaction) {
     const minutes = Math.floor((result.remaining % 3600) / 60);
     await interaction.reply({
       content: `⏰ You already claimed your daily reward! Come back in **${hours}h ${minutes}m**.`,
-      ephemeral: true,
+      flags: 64,
     });
   } else {
-    await interaction.reply({ content: `❌ ${result.reason}`, ephemeral: true });
+    await interaction.reply({ content: `❌ ${result.reason}`, flags: 64 });
   }
 }
 
@@ -147,7 +147,7 @@ async function handleStats(interaction) {
     .setThumbnail(interaction.user.displayAvatarURL())
     .setTimestamp();
   
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+  await interaction.reply({ embeds: [embed], flags: 64 });
 }
 
 async function handleGive(interaction) {
@@ -155,17 +155,17 @@ async function handleGive(interaction) {
   const amount = interaction.options.getInteger('amount');
   
   if (target.id === interaction.user.id) {
-    return interaction.reply({ content: '❌ You cannot give coins to yourself!', ephemeral: true });
+    return interaction.reply({ content: '❌ You cannot give coins to yourself!', flags: 64 });
   }
   if (target.bot) {
-    return interaction.reply({ content: '❌ You cannot give coins to bots!', ephemeral: true });
+    return interaction.reply({ content: '❌ You cannot give coins to bots!', flags: 64 });
   }
 
   const sender = getPlayer(interaction.user.id, interaction.user.username);
   if (sender.balance < amount) {
     return interaction.reply({
       content: `❌ Insufficient funds! You have **${sender.balance.toLocaleString()}** coins.`,
-      ephemeral: true,
+      flags: 64,
     });
   }
 
@@ -185,11 +185,30 @@ async function handleAdmin(interaction) {
   if (!isAdmin(interaction)) {
     return interaction.reply({
       content: '🔐 **Bạn không có quyền dùng lệnh admin!**',
-      ephemeral: true,
+      flags: 64,
     });
   }
 
-  const sub = interaction.options.getSubcommand();
+  const sub = interaction.options.getSubcommand(false);
+
+  if (!sub) {
+    const embed = new EmbedBuilder()
+      .setColor(0x5865F2)
+      .setTitle('🔐 Admin · Danh Sách Lệnh')
+      .setDescription([
+        '`/admin addcoins` — Thêm coins cho người dùng',
+        '`/admin removecoins` — Xoá coins của người dùng',
+        '`/admin setcoins` — Đặt số coins cụ thể',
+        '`/admin resetbalance` — Reset số dư về mặc định',
+        '`/admin checkuser` — Xem thông tin chi tiết người dùng',
+        '`/admin resetdaily` — Reset daily reward',
+        '`/admin setresult` — Can thiệp kết quả ván tiếp theo',
+      ].join('\n'))
+      .setFooter({ text: 'Chỉ admin mới thấy và dùng được lệnh này' })
+      .setTimestamp();
+    return interaction.reply({ embeds: [embed], flags: 64 });
+  }
+
   const target = interaction.options.getUser('user');
   const amount = interaction.options.getInteger('amount');
 
@@ -208,7 +227,7 @@ async function handleAdmin(interaction) {
         )
         .setFooter({ text: `Thực hiện bởi ${interaction.user.username}` })
         .setTimestamp();
-      return interaction.reply({ embeds: [embed], ephemeral: true });
+      return interaction.reply({ embeds: [embed], flags: 64 });
     }
 
     case 'removecoins': {
@@ -226,7 +245,7 @@ async function handleAdmin(interaction) {
         )
         .setFooter({ text: `Thực hiện bởi ${interaction.user.username}` })
         .setTimestamp();
-      return interaction.reply({ embeds: [embed], ephemeral: true });
+      return interaction.reply({ embeds: [embed], flags: 64 });
     }
 
     case 'setcoins': {
@@ -241,7 +260,7 @@ async function handleAdmin(interaction) {
         )
         .setFooter({ text: `Thực hiện bởi ${interaction.user.username}` })
         .setTimestamp();
-      return interaction.reply({ embeds: [embed], ephemeral: true });
+      return interaction.reply({ embeds: [embed], flags: 64 });
     }
 
     case 'resetbalance': {
@@ -257,13 +276,13 @@ async function handleAdmin(interaction) {
         )
         .setFooter({ text: `Thực hiện bởi ${interaction.user.username}` })
         .setTimestamp();
-      return interaction.reply({ embeds: [embed], ephemeral: true });
+      return interaction.reply({ embeds: [embed], flags: 64 });
     }
 
     case 'checkuser': {
       const player = getPlayer(target.id, target.username);
       if (!player) {
-        return interaction.reply({ content: `❌ Người dùng <@${target.id}> chưa chơi bao giờ.`, ephemeral: true });
+        return interaction.reply({ content: `❌ Người dùng <@${target.id}> chưa chơi bao giờ.`, flags: 64 });
       }
       const winRate = player.games_played > 0
         ? ((player.total_won / (player.total_won + player.total_lost)) * 100).toFixed(1)
@@ -291,7 +310,7 @@ async function handleAdmin(interaction) {
         .setThumbnail(target.displayAvatarURL())
         .setFooter({ text: `ID: ${target.id}` })
         .setTimestamp();
-      return interaction.reply({ embeds: [embed], ephemeral: true });
+      return interaction.reply({ embeds: [embed], flags: 64 });
     }
 
     case 'resetdaily': {
@@ -303,7 +322,7 @@ async function handleAdmin(interaction) {
         .setDescription(`<@${target.id}> có thể nhận daily reward ngay bây giờ!`)
         .setFooter({ text: `Thực hiện bởi ${interaction.user.username}` })
         .setTimestamp();
-      return interaction.reply({ embeds: [embed], ephemeral: true });
+      return interaction.reply({ embeds: [embed], flags: 64 });
     }
 
     case 'setresult': {
@@ -317,7 +336,7 @@ async function handleAdmin(interaction) {
           .setDescription('Ván tiếp theo sẽ **ngẫu nhiên** bình thường.')
           .setFooter({ text: `Thực hiện bởi ${interaction.user.username}` })
           .setTimestamp();
-        return interaction.reply({ embeds: [embed], ephemeral: true });
+        return interaction.reply({ embeds: [embed], flags: 64 });
       }
       roundManager.forceResult = result;
       const labelMap = { TAI: '🔴 Tài', XIU: '🔵 Xỉu', TRIPLE: '⭐ Triple' };
@@ -330,11 +349,11 @@ async function handleAdmin(interaction) {
 ⚠️ Tự động reset sau 1 ván.`)
         .setFooter({ text: `Thực hiện bởi ${interaction.user.username}` })
         .setTimestamp();
-      return interaction.reply({ embeds: [embed], ephemeral: true });
+      return interaction.reply({ embeds: [embed], flags: 64 });
     }
 
     default:
-      return interaction.reply({ content: '❓ Subcommand không hợp lệ.', ephemeral: true });
+      return interaction.reply({ content: '❓ Subcommand không hợp lệ.', flags: 64 });
   }
 }
 
