@@ -9,7 +9,6 @@ const {
   handleBalance, handleDaily, handleLeaderboard, handleStats, handleGive, handleAdmin,
 } = require('./commands/handlers');
 
-// Validate required env vars
 const REQUIRED = ['DISCORD_TOKEN', 'CLIENT_ID'];
 for (const key of REQUIRED) {
   if (!process.env[key]) {
@@ -25,36 +24,42 @@ const client = new Client({
   ],
 });
 
-// ─── Ready ───────────────────────────────────────────────────────────────────
 client.once(Events.ClientReady, () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
   console.log(`🎲 Sic Bo Bot is ready! Serving ${client.guilds.cache.size} guild(s).`);
-  client.user.setActivity('🎲 Sic Bo | /sicbo start');
+  client.user.setActivity('🎲 Tài Xỉu | /sicbo start');
 });
 
-// ─── Slash Commands ───────────────────────────────────────────────────────────
 client.on(Events.InteractionCreate, async (interaction) => {
 
-  // ── Button Interactions (bets) ──────────────────────────────────────────
+  // ── Nút bấm → hiện modal nhập tiền ─────────────────────────────────────
   if (interaction.isButton()) {
-    const [prefix, betType, amountStr] = interaction.customId.split('_');
-    if (prefix !== 'bet') return;
+    const parts = interaction.customId.split('_');
+    if (parts[0] !== 'betmodal') return;
+    const betType = parts[1]; // TAI | XIU | TRIPLE
+    await roundManager.showBetModal(interaction, betType);
+    return;
+  }
 
-    const amount = parseInt(amountStr);
-    if (isNaN(amount) || amount <= 0) return;
-
+  // ── Modal submit → đặt cược ─────────────────────────────────────────────
+  if (interaction.isModalSubmit()) {
+    const parts = interaction.customId.split('_');
+    if (parts[0] !== 'betsubmit') return;
+    const betType = parts[1];
+    const raw = interaction.fields.getTextInputValue('bet_amount').replace(/[,. ]/g, '');
+    const amount = parseInt(raw);
     await roundManager.placeBet(interaction, betType, amount);
     return;
   }
 
-  // ── Slash Commands ──────────────────────────────────────────────────────
+  // ── Slash commands ──────────────────────────────────────────────────────
   if (!interaction.isChatInputCommand()) return;
 
   try {
     switch (interaction.commandName) {
       case 'sicbo': {
         const sub = interaction.options.getSubcommand();
-        if (sub === 'start') await handleSicboStart(interaction);
+        if (sub === 'start')     await handleSicboStart(interaction);
         else if (sub === 'stop') await handleSicboStop(interaction);
         else if (sub === 'autostart') await handleSicboAutostart(interaction);
         break;
@@ -66,11 +71,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
       case 'give':        await handleGive(interaction);        break;
       case 'admin':       await handleAdmin(interaction);       break;
       default:
-        await interaction.reply({ content: '❓ Unknown command.', ephemeral: true });
+        await interaction.reply({ content: '❓ Lệnh không hợp lệ.', ephemeral: true });
     }
   } catch (err) {
     console.error(`Error handling command "${interaction.commandName}":`, err);
-    const msg = { content: '❌ An error occurred. Please try again.', ephemeral: true };
+    const msg = { content: '❌ Có lỗi xảy ra. Vui lòng thử lại.', ephemeral: true };
     if (interaction.replied || interaction.deferred) {
       await interaction.followUp(msg).catch(() => {});
     } else {
@@ -79,7 +84,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
-// ─── Error handling ───────────────────────────────────────────────────────────
 client.on('error', (err) => console.error('Discord client error:', err));
 process.on('unhandledRejection', (err) => console.error('Unhandled rejection:', err));
 process.on('SIGINT', () => { client.destroy(); process.exit(0); });
