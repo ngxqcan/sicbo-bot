@@ -137,4 +137,20 @@ function getLeaderboard() {
   return stmts.getLeaderboard.all();
 }
 
-module.exports = { getPlayer, adjustBalance, updateStats, claimDaily, recordBets, getLeaderboard, db };
+function getRecentRounds(limit = 10) {
+  return db.prepare(`
+    SELECT round_id, dice1, dice2, dice3, (dice1+dice2+dice3) as total,
+      CASE
+        WHEN dice1=dice2 AND dice2=dice3 THEN 'TRIPLE'
+        WHEN dice1+dice2+dice3 >= 11 THEN 'TAI'
+        ELSE 'XIU'
+      END as result
+    FROM bet_history
+    WHERE dice1 IS NOT NULL
+    GROUP BY round_id
+    ORDER BY id DESC
+    LIMIT ?
+  `).all(limit);
+}
+
+module.exports = { getPlayer, adjustBalance, updateStats, claimDaily, recordBets, getLeaderboard, getRecentRounds, db };

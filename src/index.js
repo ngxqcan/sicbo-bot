@@ -33,8 +33,56 @@ client.once(Events.ClientReady, () => {
 
 client.on(Events.InteractionCreate, async (interaction) => {
 
-  // ── Nút bấm → hiện modal nhập tiền ─────────────────────────────────────
+  // ── Nút bấm ────────────────────────────────────────────────────────────────
   if (interaction.isButton()) {
+    // Nút Soi Cầu
+    if (interaction.customId === 'soicau') {
+      const { getRecentRounds } = require('./utils/database');
+      const rounds = getRecentRounds(10);
+
+      const ICONS = { TAI: '🔴', XIU: '🔵', TRIPLE: '⭐' };
+      const NAMES = { TAI: 'Tài', XIU: 'Xỉu', TRIPLE: 'Triple' };
+
+      let historyText = '';
+      if (rounds.length === 0) {
+        historyText = '*Chưa có lịch sử ván nào.*';
+      } else {
+        // Đếm thống kê
+        const counts = { TAI: 0, XIU: 0, TRIPLE: 0 };
+        rounds.forEach(r => counts[r.result]++);
+
+        // Dãy kết quả gần nhất
+        const row = rounds.map(r => ICONS[r.result]).join(' ');
+
+        historyText = `**Dãy kết quả (mới → cũ):**
+${row}
+
+` +
+          `🔴 Tài: **${counts.TAI}** lần  🔵 Xỉu: **${counts.XIU}** lần  ⭐ Triple: **${counts.TRIPLE}** lần`;
+
+        // Chi tiết từng ván
+        const details = rounds.map((r, i) => {
+          const d = `${r.dice1}-${r.dice2}-${r.dice3}`;
+          return `\`${i+1}.\` ${ICONS[r.result]} **${NAMES[r.result]}** · ${d} (${r.total})`;
+        }).join('
+');
+        historyText += `
+
+**Chi tiết:**
+${details}`;
+      }
+
+      const { EmbedBuilder } = require('discord.js');
+      const embed = new EmbedBuilder()
+        .setColor(0x9B59B6)
+        .setTitle('🔮 Soi Cầu — 10 Ván Gần Nhất')
+        .setDescription(historyText)
+        .setTimestamp();
+
+      return interaction.reply({ embeds: [embed], ephemeral: true });
+    }
+
+    // Nút cược → hiện modal
     const parts = interaction.customId.split('_');
     if (parts[0] !== 'betmodal') return;
     const betType = parts[1]; // TAI | XIU | TRIPLE

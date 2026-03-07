@@ -2,7 +2,7 @@
 
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const { rollDice, resolveBets, formatDice, formatRoundResult, BET_TYPES, BET_LABELS, PAYOUTS } = require('./engine');
-const { getPlayer, adjustBalance, updateStats, recordBets } = require('../utils/database');
+const { getPlayer, adjustBalance, updateStats, recordBets, getRecentRounds } = require('../utils/database');
 
 const ROUND_DURATION = parseInt(process.env.ROUND_DURATION || '30000');
 const MIN_BET = parseInt(process.env.MIN_BET || '10');
@@ -94,6 +94,12 @@ class RoundManager {
         .setStyle(ButtonStyle.Success)
         .setEmoji('⭐')
         .setDisabled(disabled),
+      new ButtonBuilder()
+        .setCustomId('soicau')
+        .setLabel('Soi Cầu')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('🔮')
+        .setDisabled(false), // luôn bật kể cả khi ván kết thúc
     );
     return [row];
   }
@@ -292,16 +298,18 @@ class RoundManager {
     // Tiêu đề kết quả
     let resultTitle = '';
     let resultDesc = '';
+    const { DICE_EMOJI } = require('./engine');
+    const diceDisplay = dice.map(d => DICE_EMOJI[d]).join('  ');
+
     if (rollResult.isTriple) {
-      resultTitle = `⭐ TRIPLE ${dice[0]}-${dice[0]}-${dice[0]}! ⭐`;
-      resultDesc = `✨ Ba xúc xắc giống nhau! Tất cả Tài/Xỉu đều thua!
-**Tổng: ${rollResult.total}**`;
+      resultTitle = `⭐ TRIPLE! ⭐`;
+      resultDesc = `${diceDisplay}\n\n✨ Ba xúc xắc giống nhau! Tất cả Tài/Xỉu đều thua!\n**Tổng: ${rollResult.total}**`;
     } else if (rollResult.isTai) {
       resultTitle = `🔴 TÀI — Tổng ${rollResult.total}`;
-      resultDesc = `Tổng **${rollResult.total}** ≥ 11 → **TÀI thắng!**`;
+      resultDesc = `${diceDisplay}\n\n🔴 **TÀI thắng!** Tổng **${rollResult.total}**`;
     } else {
       resultTitle = `🔵 XỈU — Tổng ${rollResult.total}`;
-      resultDesc = `Tổng **${rollResult.total}** ≤ 10 → **XỈU thắng!**`;
+      resultDesc = `${diceDisplay}\n\n🔵 **XỈU thắng!** Tổng **${rollResult.total}**`;
     }
 
     const resultEmbed = new EmbedBuilder()
@@ -331,7 +339,11 @@ class RoundManager {
       });
     } catch { /* tin nhắn có thể đã bị xoá */ }
 
-    await channel.send({ embeds: [resultEmbed] });
+    // Gửi kết quả rồi tự xóa sau 10 giây
+    const resultMsg = await channel.send({ embeds: [resultEmbed] });
+    setTimeout(async () => {
+      try { await resultMsg.delete(); } catch { /* tin nhắn đã bị xóa */ }
+    }, 10000);
 
     if (autoRestart) {
       setTimeout(() => this.startRound(channel, true), 5000);
