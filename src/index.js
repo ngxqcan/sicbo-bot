@@ -54,22 +54,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
         // Dãy kết quả gần nhất
         const row = rounds.map(r => ICONS[r.result]).join(' ');
 
-        historyText = `**Dãy kết quả (mới → cũ):**
-${row}
-
-` +
+        historyText = `**Dãy kết quả (mới → cũ):**\n${row}\n\n` +
           `🔴 Tài: **${counts.TAI}** lần  🔵 Xỉu: **${counts.XIU}** lần  ⭐ Triple: **${counts.TRIPLE}** lần`;
 
         // Chi tiết từng ván
         const details = rounds.map((r, i) => {
           const d = `${r.dice1}-${r.dice2}-${r.dice3}`;
           return `\`${i+1}.\` ${ICONS[r.result]} **${NAMES[r.result]}** · ${d} (${r.total})`;
-        }).join('
-');
-        historyText += `
-
-**Chi tiết:**
-${details}`;
+        }).join('\n');
+        historyText += `\n\n**Chi tiết:**\n${details}`;
       }
 
       const { EmbedBuilder } = require('discord.js');
