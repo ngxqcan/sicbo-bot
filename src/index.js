@@ -89,8 +89,21 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const parts = interaction.customId.split('_');
     if (parts[0] !== 'betsubmit') return;
     const betType = parts[1];
-    const raw = interaction.fields.getTextInputValue('bet_amount').replace(/[,. ]/g, '');
-    const amount = parseInt(raw);
+    const raw = interaction.fields.getTextInputValue('bet_amount').trim().toLowerCase();
+
+    const { getPlayer } = require('./utils/database');
+    const MIN_BET = parseInt(process.env.MIN_BET || '10');
+    const player = getPlayer(interaction.user.id, interaction.user.username);
+
+    let amount;
+    if (raw === 'max' || raw === 'allin' || raw === 'all') {
+      amount = player.balance; // all-in
+    } else if (raw === 'min') {
+      amount = MIN_BET;
+    } else {
+      amount = parseInt(raw.replace(/[,. ]/g, ''));
+    }
+
     await roundManager.placeBet(interaction, betType, amount);
     return;
   }

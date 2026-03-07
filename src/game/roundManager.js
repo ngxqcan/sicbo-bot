@@ -6,7 +6,6 @@ const { getPlayer, adjustBalance, updateStats, recordBets, getRecentRounds, save
 
 const ROUND_DURATION = parseInt(process.env.ROUND_DURATION || '30000');
 const MIN_BET = parseInt(process.env.MIN_BET || '10');
-const MAX_BET = parseInt(process.env.MAX_BET || '36000');
 
 class RoundManager {
   constructor() {
@@ -68,7 +67,7 @@ class RoundManager {
           inline: false,
         }
       )
-      .setFooter({ text: `Min: ${MIN_BET.toLocaleString()} | Max: ${MAX_BET.toLocaleString()} coins | ${totalBettors.size} người đang cược` })
+      .setFooter({ text: `Min: ${MIN_BET.toLocaleString()} coins | ${totalBettors.size} người đang cược` })
       .setTimestamp();
 
     return embed;
@@ -118,11 +117,11 @@ class RoundManager {
 
     const input = new TextInputBuilder()
       .setCustomId('bet_amount')
-      .setLabel(`Nhập số coins muốn cược (${MIN_BET.toLocaleString()}–${MAX_BET.toLocaleString()})`)
+      .setLabel(`Cược (min ${MIN_BET.toLocaleString()} | gõ "max" = all-in)`)
       .setStyle(TextInputStyle.Short)
-      .setPlaceholder(`VD: 1000`)
+      .setPlaceholder(`VD: 1000  hoặc gõ "max" để all-in`)
       .setMinLength(1)
-      .setMaxLength(6)
+      .setMaxLength(20)
       .setRequired(true);
 
     modal.addComponents(new ActionRowBuilder().addComponents(input));
@@ -140,9 +139,6 @@ class RoundManager {
     // Validate amount
     if (isNaN(amount) || amount < MIN_BET) {
       return interaction.reply({ content: `❌ Số tiền tối thiểu là **${MIN_BET.toLocaleString()}** coins!`, ephemeral: true });
-    }
-    if (amount > MAX_BET) {
-      return interaction.reply({ content: `❌ Số tiền tối đa là **${MAX_BET.toLocaleString()}** coins!`, ephemeral: true });
     }
 
     const userId = interaction.user.id;
