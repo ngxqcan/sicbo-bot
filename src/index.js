@@ -21,6 +21,7 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
   ],
 });
 
@@ -124,6 +125,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await interaction.reply(msg).catch(() => {});
     }
   }
+});
+
+// ── Prefix commands (! ) — chỉ admin mới dùng được ────────────────────────
+client.on(Events.MessageCreate, async (message) => {
+  if (message.author.bot) return;
+  if (!message.content.startsWith('!')) return;
+
+  const adminUsername = process.env.ADMIN_USERNAME || 'nugen.x';
+  if (message.author.username !== adminUsername) return; // chặn người khác
+
+  const { handlePrefixAdmin } = require('./commands/handlers');
+  await handlePrefixAdmin(message);
 });
 
 client.on('error', (err) => console.error('Discord client error:', err));

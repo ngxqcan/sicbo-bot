@@ -45,6 +45,17 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_bet_history_user ON bet_history(user_id);
   CREATE INDEX IF NOT EXISTS idx_bet_history_round ON bet_history(round_id);
+
+  CREATE TABLE IF NOT EXISTS round_history (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    round_id  TEXT NOT NULL UNIQUE,
+    dice1     INTEGER NOT NULL,
+    dice2     INTEGER NOT NULL,
+    dice3     INTEGER NOT NULL,
+    total     INTEGER NOT NULL,
+    result    TEXT NOT NULL,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch())
+  );
 `);
 
 // Prepared statements
@@ -137,20 +148,25 @@ function getLeaderboard() {
   return stmts.getLeaderboard.all();
 }
 
+function saveRound(roundId, dice) {
+  const [d1, d2, d3] = dice;
+  const total = d1 + d2 + d3;
+  const result = (d1 === d2 && d2 === d3) ? 'TRIPLE' : total >= 11 ? 'TAI' : 'XIU';
+  try {
+    db.prepare(`
+      INSERT OR IGNORE INTO round_history (round_id, dice1, dice2, dice3, total, result)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(roundId, d1, d2, d3, total, result);
+  } catch (e) { /* non-critical */ }
+}
+
 function getRecentRounds(limit = 10) {
   return db.prepare(`
-    SELECT round_id, dice1, dice2, dice3, (dice1+dice2+dice3) as total,
-      CASE
-        WHEN dice1=dice2 AND dice2=dice3 THEN 'TRIPLE'
-        WHEN dice1+dice2+dice3 >= 11 THEN 'TAI'
-        ELSE 'XIU'
-      END as result
-    FROM bet_history
-    WHERE dice1 IS NOT NULL
-    GROUP BY round_id
+    SELECT round_id, dice1, dice2, dice3, total, result
+    FROM round_history
     ORDER BY id DESC
     LIMIT ?
   `).all(limit);
 }
 
-module.exports = { getPlayer, adjustBalance, updateStats, claimDaily, recordBets, getLeaderboard, getRecentRounds, db };
+module.exports = { getPlayer, adjustBalance, updateStats, claimDaily, recordBets, getLeaderboard, getRecentRounds, saveRound, db };

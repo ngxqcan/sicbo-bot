@@ -2,7 +2,7 @@
 
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const { rollDice, resolveBets, formatDice, formatRoundResult, BET_TYPES, BET_LABELS, PAYOUTS } = require('./engine');
-const { getPlayer, adjustBalance, updateStats, recordBets, getRecentRounds } = require('../utils/database');
+const { getPlayer, adjustBalance, updateStats, recordBets, getRecentRounds, saveRound } = require('../utils/database');
 
 const ROUND_DURATION = parseInt(process.env.ROUND_DURATION || '30000');
 const MIN_BET = parseInt(process.env.MIN_BET || '10');
@@ -265,6 +265,7 @@ class RoundManager {
     } else {
       dice = rollDice();
     }
+    saveRound(round.roundId, dice); // lưu kết quả ván vào round_history
     const betsArray = Object.values(round.bets);
     const { results, rollResult } = resolveBets(betsArray, dice);
 
@@ -305,17 +306,18 @@ class RoundManager {
     let resultTitle = '';
     let resultDesc = '';
     const { DICE_EMOJI } = require('./engine');
+    // Xúc xắc to ở tiêu đề
     const diceDisplay = dice.map(d => DICE_EMOJI[d]).join('  ');
 
     if (rollResult.isTriple) {
-      resultTitle = `⭐ TRIPLE! ⭐`;
-      resultDesc = `${diceDisplay}\n\n✨ Ba xúc xắc giống nhau! Tất cả Tài/Xỉu đều thua!\n**Tổng: ${rollResult.total}**`;
+      resultTitle = diceDisplay;
+      resultDesc = `⭐ **TRIPLE!** — Tổng **${rollResult.total}**\n✨ Tất cả Tài/Xỉu đều thua!`;
     } else if (rollResult.isTai) {
-      resultTitle = `🔴 TÀI — Tổng ${rollResult.total}`;
-      resultDesc = `${diceDisplay}\n\n🔴 **TÀI thắng!** Tổng **${rollResult.total}**`;
+      resultTitle = diceDisplay;
+      resultDesc = `🔴 **TÀI thắng!** — Tổng **${rollResult.total}**`;
     } else {
-      resultTitle = `🔵 XỈU — Tổng ${rollResult.total}`;
-      resultDesc = `${diceDisplay}\n\n🔵 **XỈU thắng!** Tổng **${rollResult.total}**`;
+      resultTitle = diceDisplay;
+      resultDesc = `🔵 **XỈU thắng!** — Tổng **${rollResult.total}**`;
     }
 
     const resultEmbed = new EmbedBuilder()
