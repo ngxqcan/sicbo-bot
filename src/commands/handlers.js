@@ -201,10 +201,91 @@ async function handleAdmin(interaction) {
       '`!resetdaily @user` — Reset daily reward',
       '`!setresult tai|xiu|triple|random` — Can thiệp kết quả',
       '`!settle <matchId> <homeScore> <awayScore>` — Settle kết quả bóng đá',
+      '`!bankinfo @user` — Xem số dư bank của người dùng',
     ].join('\n'))
     .setFooter({ text: 'Dùng prefix ! — không hiển thị trong autocomplete với người thường' })
     .setTimestamp();
   return interaction.reply({ embeds: [embed], flags: 64 });
+}
+
+// ── BANK HANDLER ─────────────────────────────────────────────────────────────
+async function handleBank(interaction) {
+  const sub = interaction.options.getSubcommand();
+  const { getBank, bankDeposit, bankWithdraw, getPlayer, INTEREST_RATE } = require('../utils/database');
+  const userId   = interaction.user.id;
+  const username = interaction.user.username;
+  const player   = getPlayer(userId, username);
+  const acc      = getBank(userId);
+  const rate     = (INTEREST_RATE * 100).toFixed(1);
+
+  if (sub === 'balance') {
+    const total = player.balance + acc.savings;
+    const embed = new EmbedBuilder()
+      .setColor(0xf1c40f)
+      .setTitle('🏦 Tài Khoản Ngân Hàng')
+      .setDescription(`<@${userId}>`)
+      .addFields(
+        { name: '💳 Ví (Wallet)',     value: `**${player.balance.toLocaleString()}** coins`, inline: true },
+        { name: '🏦 Tiết Kiệm (Bank)',value: `**${acc.savings.toLocaleString()}** coins`,   inline: true },
+        { name: '💰 Tổng Tài Sản',    value: `**${total.toLocaleString()}** coins`,          inline: true },
+        { name: '📈 Lãi Suất',        value: `**${rate}%** / giờ`,                           inline: true },
+      )
+      .setThumbnail(interaction.user.displayAvatarURL())
+      .setFooter({ text: 'Lãi được tính và cộng tự động mỗi giờ' })
+      .setTimestamp();
+    return interaction.reply({ embeds: [embed], flags: 64 });
+  }
+
+  const raw = interaction.options.getString('amount').trim().toLowerCase();
+  let amount;
+  if (raw === 'max' || raw === 'all') {
+    amount = sub === 'deposit' ? player.balance : acc.savings;
+  } else {
+    amount = parseInt(raw.replace(/[,. ]/g, ''));
+  }
+
+  if (isNaN(amount) || amount <= 0) {
+    return interaction.reply({ content: '❌ Số tiền không hợp lệ!', flags: 64 });
+  }
+
+  if (sub === 'deposit') {
+    if (player.balance < amount) {
+      return interaction.reply({ content: `❌ Ví không đủ! Hiện có **${player.balance.toLocaleString()}** coins.`, flags: 64 });
+    }
+    const result = bankDeposit(userId, amount);
+    if (result.error) return interaction.reply({ content: `❌ ${result.error}`, flags: 64 });
+
+    const updated = getBank(userId);
+    const embed = new EmbedBuilder()
+      .setColor(0x2ecc71)
+      .setTitle('🏦 Gửi Tiền Thành Công')
+      .addFields(
+        { name: '➕ Đã gửi',         value: `**${amount.toLocaleString()}** coins`,           inline: true },
+        { name: '🏦 Số dư Bank',     value: `**${updated.savings.toLocaleString()}** coins`,  inline: true },
+        { name: '💳 Số dư Ví',       value: `**${(player.balance - amount).toLocaleString()}** coins`, inline: true },
+        { name: '📈 Lãi Suất',       value: `**${rate}%** / giờ`,                             inline: true },
+      )
+      .setTimestamp();
+    return interaction.reply({ embeds: [embed], flags: 64 });
+  }
+
+  if (sub === 'withdraw') {
+    const result = bankWithdraw(userId, amount);
+    if (result.error) return interaction.reply({ content: `❌ ${result.error}`, flags: 64 });
+
+    const updatedAcc    = getBank(userId);
+    const updatedPlayer = getPlayer(userId, username);
+    const embed = new EmbedBuilder()
+      .setColor(0xe74c3c)
+      .setTitle('🏦 Rút Tiền Thành Công')
+      .addFields(
+        { name: '➖ Đã rút',     value: `**${amount.toLocaleString()}** coins`,              inline: true },
+        { name: '🏦 Số dư Bank', value: `**${updatedAcc.savings.toLocaleString()}** coins`,  inline: true },
+        { name: '💳 Số dư Ví',   value: `**${updatedPlayer.balance.toLocaleString()}** coins`, inline: true },
+      )
+      .setTimestamp();
+    return interaction.reply({ embeds: [embed], flags: 64 });
+  }
 }
 
 // ── FOOTBALL HANDLERS ────────────────────────────────────────────────────────
@@ -386,19 +467,27 @@ async function handlePrefixAdmin(message) {
     if (result.error) return message.reply(`❌ ${result.error}`);
     return message.reply(`✅ Đã settle trận \`${matchId}\` — ${homeScore}:${awayScore} · ${result.totalBets} cược được xử lý`);
   }
+
+  if (cmd === 'bankinfo') {
+    const target = await resolveUser(args[1]);
+    if (!target) return message.reply('❌ Dùng: `!bankinfo @user`');
+    const { getBank, getPlayer: gp, INTEREST_RATE } = require('../utils/database');
+    const player = gp(target.id, target.username);
+    const acc    = getBank(target.id);
+    const total  = player.balance + acc.savings;
+    return message.reply(
+      `🏦 **Bank của ${target.username}**\n` +
+      `💳 Ví: **${player.balance.toLocaleString()}** coins\n` +
+      `🏦 Tiết kiệm: **${acc.savings.toLocaleString()}** coins\n` +
+      `💰 Tổng: **${total.toLocaleString()}** coins\n` +
+      `📈 Lãi: **${(INTEREST_RATE * 100).toFixed(1)}%**/giờ`
+    );
+  }
 }
 
 module.exports = {
-  handleSicboStart,
-  handleSicboStop,
-  handleSicboAutostart,
-  handleBalance,
-  handleDaily,
-  handleLeaderboard,
-  handleStats,
-  handleGive,
-  handleAdmin,
-  handleFootball,
-  handlePrefixAdmin,
-  autoChannels,
+  handleSicboStart, handleSicboStop, handleSicboAutostart,
+  handleBalance, handleDaily, handleLeaderboard, handleStats, handleGive,
+  handleAdmin, handleBank, handleFootball,
+  handlePrefixAdmin, autoChannels,
 };

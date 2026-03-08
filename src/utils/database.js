@@ -56,6 +56,13 @@ db.exec(`
     result    TEXT NOT NULL,
     created_at INTEGER NOT NULL DEFAULT (unixepoch())
   );
+
+  CREATE TABLE IF NOT EXISTS bank_accounts (
+    user_id       TEXT PRIMARY KEY,
+    savings       INTEGER NOT NULL DEFAULT 0,
+    last_interest INTEGER NOT NULL DEFAULT (unixepoch()),
+    FOREIGN KEY(user_id) REFERENCES players(user_id)
+  );
 `);
 
 // Prepared statements
@@ -169,4 +176,60 @@ function getRecentRounds(limit = 10) {
   `).all(limit);
 }
 
-module.exports = { getPlayer, adjustBalance, updateStats, claimDaily, recordBets, getLeaderboard, getRecentRounds, saveRound, db };
+// ── BANK ─────────────────────────────────────────────────────────────────────
+const INTEREST_RATE  = parseFloat(process.env.BANK_INTEREST_RATE  || '0.01'); // 1%/giờ
+const INTEREST_CAP   = parseInt(process.env.BANK_INTEREST_CAP     || '0');    // 0 = không giới hạn
+const MAX_SAVINGS    = parseInt(process.env.BANK_MAX_SAVINGS       || '0');    // 0 = không giới hạn
+
+function getBank(userId) {
+  let acc = db.prepare('SELECT * FROM bank_accounts WHERE user_id = ?').get(userId);
+  if (!acc) {
+    db.prepare('INSERT OR IGNORE INTO bank_accounts (user_id) VALUES (?)').run(userId);
+    acc = db.prepare('SELECT * FROM bank_accounts WHERE user_id = ?').get(userId);
+  }
+  return acc;
+}
+
+function bankDeposit(userId, amount) {
+  getBank(userId); // đảm bảo tài khoản tồn tại
+  if (MAX_SAVINGS > 0) {
+    const acc = getBank(userId);
+    const newTotal = acc.savings + amount;
+    if (newTotal > MAX_SAVINGS) return { error: `Vượt giới hạn tiết kiệm tối đa **${MAX_SAVINGS.toLocaleString()}** coins!` };
+  }
+  db.prepare('UPDATE players SET balance = balance - ? WHERE user_id = ?').run(amount, userId);
+  db.prepare('UPDATE bank_accounts SET savings = savings + ? WHERE user_id = ?').run(amount, userId);
+  return { success: true };
+}
+
+function bankWithdraw(userId, amount) {
+  const acc = getBank(userId);
+  if (acc.savings < amount) return { error: `Số dư ngân hàng không đủ! Hiện có **${acc.savings.toLocaleString()}** coins.` };
+  db.prepare('UPDATE bank_accounts SET savings = savings - ? WHERE user_id = ?').run(amount, userId);
+  db.prepare('UPDATE players SET balance = balance + ? WHERE user_id = ?').run(amount, userId);
+  return { success: true };
+}
+
+// Tính và cộng lãi suất cho tất cả tài khoản
+function applyInterest() {
+  const now  = Math.floor(Date.now() / 1000);
+  const accs = db.prepare('SELECT * FROM bank_accounts WHERE savings > 0').all();
+  let   total = 0;
+  const apply = db.transaction(() => {
+    for (const acc of accs) {
+      const hoursElapsed = (now - acc.last_interest) / 3600;
+      if (hoursElapsed < 1) continue;
+      const fullHours  = Math.floor(hoursElapsed);
+      let   interest   = Math.floor(acc.savings * INTEREST_RATE * fullHours);
+      if (INTEREST_CAP > 0) interest = Math.min(interest, INTEREST_CAP);
+      if (interest <= 0) continue;
+      db.prepare('UPDATE bank_accounts SET savings = savings + ?, last_interest = last_interest + ? WHERE user_id = ?')
+        .run(interest, fullHours * 3600, acc.user_id);
+      total += interest;
+    }
+  });
+  apply();
+  return total;
+}
+
+module.exports = { getPlayer, adjustBalance, updateStats, claimDaily, recordBets, getLeaderboard, getRecentRounds, saveRound, getBank, bankDeposit, bankWithdraw, applyInterest, INTEREST_RATE, db };

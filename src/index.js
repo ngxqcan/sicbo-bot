@@ -7,7 +7,7 @@ const roundManager = require('./game/roundManager');
 const {
   handleSicboStart, handleSicboStop, handleSicboAutostart,
   handleBalance, handleDaily, handleLeaderboard, handleStats, handleGive, handleAdmin,
-  handleFootball,
+  handleBank, handleFootball,
 } = require('./commands/handlers');
 
 const REQUIRED = ['DISCORD_TOKEN', 'CLIENT_ID'];
@@ -40,6 +40,13 @@ client.once(Events.ClientReady, () => {
   // Tự động kiểm tra kết quả bóng đá mỗi 5 phút
   const { autoCheckResults } = require('./game/footballManager');
   setInterval(() => autoCheckResults(client), 5 * 60 * 1000).unref();
+
+  // Tự động tính lãi suất ngân hàng mỗi giờ
+  const { applyInterest } = require('./utils/database');
+  setInterval(() => {
+    const total = applyInterest();
+    if (total > 0) console.log(`🏦 Applied interest: +${total.toLocaleString()} coins total`);
+  }, 60 * 60 * 1000).unref();
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
@@ -155,6 +162,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       case 'stats':       await handleStats(interaction);       break;
       case 'give':        await handleGive(interaction);        break;
       case 'admin':       await handleAdmin(interaction);       break;
+      case 'bank':        await handleBank(interaction);        break;
       case 'football':    await handleFootball(interaction);    break;
       default:
         await interaction.reply({ content: '❓ Lệnh không hợp lệ.', ephemeral: true });
