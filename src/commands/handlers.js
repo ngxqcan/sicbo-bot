@@ -11,7 +11,7 @@ const autoChannels = new Set();
 // Admin được xác định bằng username Discord (không phải display name)
 // Set ADMIN_USERNAME=nugen.x trong .env
 function isAdmin(interaction) {
-  const adminId = process.env.ADMIN_ID || '885779352208437298';
+  const adminId = process.env.ADMIN_ID || '706473658641678346';
   return interaction.user.id === adminId;
 }
 

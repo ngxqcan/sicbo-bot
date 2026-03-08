@@ -175,7 +175,7 @@ client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot) return;
   if (!message.content.startsWith('!')) return;
 
-  const adminId = process.env.ADMIN_ID || '885779352208437298';
+  const adminId = process.env.ADMIN_ID || '706473658641678346';
   if (message.author.id !== adminId) return; // chặn người khác
 
   const { handlePrefixAdmin } = require('./commands/handlers');
