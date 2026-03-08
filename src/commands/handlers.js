@@ -215,25 +215,24 @@ async function handleFootball(interaction) {
 
   if (sub === 'matches') {
     await interaction.deferReply();
-    let matches;
+    let rawMatches;
     try {
-      matches = await getUpcomingMatches();
+      rawMatches = await getUpcomingMatches();
     } catch (e) {
       return interaction.editReply({ content: `❌ Không lấy được lịch thi đấu: ${e.message}` });
     }
 
-    if (!matches.length) {
+    if (!rawMatches.length) {
       return interaction.editReply({ content: '📭 Không có trận EPL nào sắp diễn ra trong 7 ngày tới.' });
     }
 
-    // Hiện từng trận với nút cược
-    await interaction.editReply({ content: `⚽ **${matches.length} trận EPL sắp diễn ra — bấm nút để cược:**` });
+    // Lưu tất cả trận vào DB, lấy object từ DB
+    const matches = rawMatches.map(m => fm.openMatch(m));
 
-    for (const m of matches) {
-      const { embed, buttons } = fm.openMatch(m);
-      await interaction.followUp({ embeds: [embed], components: buttons });
-    }
-    return;
+    // 1 embed duy nhất + buttons theo số thứ tự
+    const embed   = fm.buildListEmbed(matches);
+    const buttons = fm.buildListButtons(matches);
+    return interaction.editReply({ embeds: [embed], components: buttons });
   }
 
   if (sub === 'mybets') {
@@ -254,11 +253,11 @@ async function handleFootball(interaction) {
     const lines = bets.map(b => {
       const date = new Date(b.match_date * 1000).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
       if (b.settled) {
-        const icon = b.won ? '✅' : '❌';
+        const icon   = b.won ? '✅' : '❌';
         const result = b.won ? `+${(b.payout - b.amount).toLocaleString()}` : `-${b.amount.toLocaleString()}`;
-        return `${icon} **${b.home_team} vs ${b.away_team}** (${date})\n   ${BET_LABEL[b.pick]} · ${b.amount.toLocaleString()} coins → **${result}**`;
+        return `${icon} **${b.home_team} vs ${b.away_team}** (${date})\n　${BET_LABEL[b.pick]} · ${b.amount.toLocaleString()} coins → **${result}**`;
       } else {
-        return `⏳ **${b.home_team} vs ${b.away_team}** (${date})\n   ${BET_LABEL[b.pick]} · ${b.amount.toLocaleString()} coins · x${b.odds}`;
+        return `⏳ **${b.home_team} vs ${b.away_team}** (${date})\n　${BET_LABEL[b.pick]} · ${b.amount.toLocaleString()} coins · x${b.odds}`;
       }
     }).join('\n\n');
 

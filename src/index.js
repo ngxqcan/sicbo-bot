@@ -94,6 +94,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return;
   }
 
+  // ── Football view match button (Trận 1, Trận 2...) ────────────────────────
+  if (interaction.isButton() && interaction.customId.startsWith('fb_view_')) {
+    const matchId = interaction.customId.slice('fb_view_'.length);
+    const fm = require('./game/footballManager');
+    await fm.viewMatch(interaction, matchId);
+    return;
+  }
+
   // ── Football bet buttons ────────────────────────────────────────────────
   if (interaction.isButton() && interaction.customId.startsWith('fb_bet_')) {
     const parts = interaction.customId.split('_'); // fb_bet_matchId_PICK
