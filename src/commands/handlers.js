@@ -2,9 +2,9 @@
 
 const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const roundManager = require('../game/roundManager');
-const { getPlayer, claimDaily, getLeaderboard, adjustBalance, db } = require('../utils/database');
+const { getPlayer, claimDaily, getLeaderboard, adjustBalance, db, addAutoChannel, removeAutoChannel } = require('../utils/database');
 
-// Track auto-restart channels
+// Track auto-restart channels (in-memory mirror của DB)
 const autoChannels = new Set();
 
 // ─── Admin check ────────────────────────────────────────────────────────────
@@ -43,6 +43,7 @@ async function handleSicboStop(interaction) {
   }
 
   autoChannels.delete(interaction.channelId);
+  removeAutoChannel(interaction.channelId);
   await interaction.reply({ content: '⏹️ Stopping current round...', flags: 64 });
   await roundManager.endRound(interaction.channel, false);
 }
@@ -56,9 +57,11 @@ async function handleSicboAutostart(interaction) {
   const channelId = interaction.channelId;
   if (autoChannels.has(channelId)) {
     autoChannels.delete(channelId);
+    removeAutoChannel(channelId);
     return interaction.reply({ content: '🔴 Auto-restart **disabled** for this channel.', flags: 64 });
   } else {
     autoChannels.add(channelId);
+    addAutoChannel(channelId, interaction.guildId);
     await interaction.reply({ content: '🟢 Auto-restart **enabled**! Starting first round...', flags: 64 });
     if (!roundManager.isActive(channelId)) {
       await roundManager.startRound(interaction.channel, true);

@@ -31,7 +31,7 @@ const client = new Client({
   }),
 });
 
-client.once(Events.ClientReady, () => {
+client.once(Events.ClientReady, async () => {
   roundManager.setClient(client);
   console.log(`✅ Logged in as ${client.user.tag}`);
   console.log(`🎲 Sic Bo Bot is ready! Serving ${client.guilds.cache.size} guild(s).`);
@@ -42,11 +42,31 @@ client.once(Events.ClientReady, () => {
   setInterval(() => autoCheckResults(client), 5 * 60 * 1000).unref();
 
   // Tự động tính lãi suất ngân hàng mỗi giờ
-  const { applyInterest } = require('./utils/database');
+  const { applyInterest, getAutoChannels } = require('./utils/database');
   setInterval(() => {
     const total = applyInterest();
     if (total > 0) console.log(`🏦 Applied interest: +${total.toLocaleString()} coins total`);
   }, 60 * 60 * 1000).unref();
+
+  // Resume các kênh autostart từ DB sau khi restart
+  const { autoChannels } = require('./commands/handlers');
+  const savedChannels = getAutoChannels();
+  if (savedChannels.length > 0) {
+    console.log(`🔄 Resuming autostart for ${savedChannels.length} channel(s)...`);
+    // Đợi 3 giây để bot fully ready trước khi gửi tin nhắn
+    await new Promise(r => setTimeout(r, 3000));
+    for (const { channel_id } of savedChannels) {
+      try {
+        const channel = await client.channels.fetch(channel_id);
+        if (!channel) continue;
+        autoChannels.add(channel_id);
+        await roundManager.startRound(channel, true);
+        console.log(`✅ Resumed autostart in #${channel.name}`);
+      } catch (e) {
+        console.error(`❌ Failed to resume channel ${channel_id}:`, e.message);
+      }
+    }
+  }
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {

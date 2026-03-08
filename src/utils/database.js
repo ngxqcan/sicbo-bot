@@ -63,6 +63,12 @@ db.exec(`
     last_interest INTEGER NOT NULL DEFAULT (unixepoch()),
     FOREIGN KEY(user_id) REFERENCES players(user_id)
   );
+
+  CREATE TABLE IF NOT EXISTS auto_channels (
+    channel_id  TEXT PRIMARY KEY,
+    guild_id    TEXT NOT NULL,
+    added_at    INTEGER NOT NULL DEFAULT (unixepoch())
+  );
 `);
 
 // Prepared statements
@@ -232,4 +238,17 @@ function applyInterest() {
   return total;
 }
 
-module.exports = { getPlayer, adjustBalance, updateStats, claimDaily, recordBets, getLeaderboard, getRecentRounds, saveRound, getBank, bankDeposit, bankWithdraw, applyInterest, INTEREST_RATE, db };
+// ── AUTO CHANNELS ─────────────────────────────────────────────────────────────
+function getAutoChannels() {
+  return db.prepare('SELECT channel_id, guild_id FROM auto_channels').all();
+}
+
+function addAutoChannel(channelId, guildId) {
+  db.prepare('INSERT OR IGNORE INTO auto_channels (channel_id, guild_id) VALUES (?, ?)').run(channelId, guildId);
+}
+
+function removeAutoChannel(channelId) {
+  db.prepare('DELETE FROM auto_channels WHERE channel_id = ?').run(channelId);
+}
+
+module.exports = { getPlayer, adjustBalance, updateStats, claimDaily, recordBets, getLeaderboard, getRecentRounds, saveRound, getBank, bankDeposit, bankWithdraw, applyInterest, INTEREST_RATE, getAutoChannels, addAutoChannel, removeAutoChannel, db };
