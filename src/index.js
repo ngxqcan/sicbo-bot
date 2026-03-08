@@ -195,4 +195,12 @@ process.on('unhandledRejection', (err) => console.error('Unhandled rejection:', 
 process.on('SIGINT', () => { client.destroy(); process.exit(0); });
 process.on('SIGTERM', () => { client.destroy(); process.exit(0); });
 
+// Tự restart mỗi 6 tiếng để tránh lag tích lũy
+const RESTART_INTERVAL = parseInt(process.env.RESTART_INTERVAL_HOURS || '6') * 60 * 60 * 1000;
+setTimeout(() => {
+  console.log('🔄 Scheduled restart — see you in a sec!');
+  client.destroy();
+  process.exit(0);
+}, RESTART_INTERVAL).unref();
+
 client.login(process.env.DISCORD_TOKEN);
