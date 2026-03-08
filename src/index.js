@@ -58,17 +58,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (rounds.length === 0) {
         historyText = '*Chưa có lịch sử ván nào.*';
       } else {
-        // Đếm thống kê
         const counts = { TAI: 0, XIU: 0, TRIPLE: 0 };
         rounds.forEach(r => counts[r.result]++);
-
-        // Dãy kết quả gần nhất
         const row = rounds.map(r => ICONS[r.result]).join(' ');
-
         historyText = `**Dãy kết quả (mới → cũ):**\n${row}\n\n` +
           `🔴 Tài: **${counts.TAI}** lần  🔵 Xỉu: **${counts.XIU}** lần  ⭐ Triple: **${counts.TRIPLE}** lần`;
-
-        // Chi tiết từng ván
         const details = rounds.map((r, i) => {
           const d = `${r.dice1}-${r.dice2}-${r.dice3}`;
           return `\`${i+1}.\` ${ICONS[r.result]} **${NAMES[r.result]}** · ${d} (${r.total})`;
@@ -82,33 +76,32 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setTitle('🔮 Soi Cầu — 10 Ván Gần Nhất')
         .setDescription(historyText)
         .setTimestamp();
-
       return interaction.reply({ embeds: [embed], ephemeral: true });
     }
 
-    // Nút cược → hiện modal
+    // ── Football: xem chi tiết trận (Trận 1, Trận 2...) ──────────────────
+    if (interaction.customId.startsWith('fb_view_')) {
+      const matchId = interaction.customId.slice('fb_view_'.length);
+      const fm = require('./game/footballManager');
+      await fm.viewMatch(interaction, matchId);
+      return;
+    }
+
+    // ── Football: chọn kèo (Thắng Nhà / Hòa / Thắng Khách) ──────────────
+    if (interaction.customId.startsWith('fb_bet_')) {
+      const parts   = interaction.customId.split('_'); // fb_bet_matchId_PICK
+      const pick    = parts[parts.length - 1];
+      const matchId = parts.slice(2, parts.length - 1).join('_');
+      const fm = require('./game/footballManager');
+      await fm.placeBet(interaction, matchId, pick);
+      return;
+    }
+
+    // Nút cược Tài Xỉu → hiện modal
     const parts = interaction.customId.split('_');
     if (parts[0] !== 'betmodal') return;
-    const betType = parts[1]; // TAI | XIU | TRIPLE
+    const betType = parts[1];
     await roundManager.showBetModal(interaction, betType);
-    return;
-  }
-
-  // ── Football view match button (Trận 1, Trận 2...) ────────────────────────
-  if (interaction.isButton() && interaction.customId.startsWith('fb_view_')) {
-    const matchId = interaction.customId.slice('fb_view_'.length);
-    const fm = require('./game/footballManager');
-    await fm.viewMatch(interaction, matchId);
-    return;
-  }
-
-  // ── Football bet buttons ────────────────────────────────────────────────
-  if (interaction.isButton() && interaction.customId.startsWith('fb_bet_')) {
-    const parts = interaction.customId.split('_'); // fb_bet_matchId_PICK
-    const pick    = parts[parts.length - 1];        // HOME / DRAW / AWAY
-    const matchId = parts.slice(2, parts.length - 1).join('_');
-    const fm = require('./game/footballManager');
-    await fm.placeBet(interaction, matchId, pick);
     return;
   }
 
