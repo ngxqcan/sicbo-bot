@@ -118,7 +118,7 @@ async function handleLeaderboard(interaction) {
 
   const embed = new EmbedBuilder()
     .setColor(0xFFD700)
-    .setTitle('🏆 Sic Bo Leaderboard')
+    .setTitle('🏆 LEADERBOARD')
     .setDescription(lines.length > 0 ? lines.join('\n') : '*No players yet!*')
     .setTimestamp();
   
