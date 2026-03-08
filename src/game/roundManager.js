@@ -7,6 +7,18 @@ const { getPlayer, adjustBalance, updateStats, recordBets, getRecentRounds, save
 const ROUND_DURATION = parseInt(process.env.ROUND_DURATION || '30000');
 const MIN_BET = parseInt(process.env.MIN_BET || '10');
 
+// Dọn dẹp dữ liệu cũ mỗi 1 tiếng — giữ DB gọn nhẹ
+const { db } = require('../utils/database');
+setInterval(() => {
+  try {
+    const keepDays = 7; // giữ lại 7 ngày
+    const cutoff = Math.floor(Date.now() / 1000) - keepDays * 86400;
+    db.prepare('DELETE FROM bet_history WHERE created_at < ?').run(cutoff);
+    db.prepare('DELETE FROM round_history WHERE created_at < ?').run(cutoff);
+    db.pragma('wal_checkpoint(TRUNCATE)'); // thu hồi file WAL
+  } catch { /* non-critical */ }
+}, 60 * 60 * 1000).unref();
+
 class RoundManager {
   constructor() {
     this.rounds = new Map();
@@ -194,16 +206,20 @@ class RoundManager {
       return { error: `Không gửi được tin nhắn: ${err.message}` };
     }
 
-    // Cập nhật embed mỗi 5 giây
+    // Cập nhật embed mỗi 1 giây — skip nếu edit trước chưa xong
+    let editing = false;
     const updateInterval = setInterval(async () => {
       const round = this.rounds.get(channel.id);
       if (!round) { clearInterval(updateInterval); return; }
       const timeLeft = ROUND_DURATION - (Date.now() - startTime);
       if (timeLeft <= 0) { clearInterval(updateInterval); return; }
+      if (editing) return; // bỏ qua tick này nếu còn đang chờ Discord
+      editing = true;
       try {
         const updatedEmbed = this.buildBettingEmbed(roundId, timeLeft, round.bets);
         await message.edit({ embeds: [updatedEmbed], components: this.buildButtons(false) });
       } catch { clearInterval(updateInterval); }
+      finally { editing = false; }
     }, 1000);
 
     const round = { roundId, startTime, bets, message, channelId: channel.id, updateInterval };
@@ -347,11 +363,11 @@ class RoundManager {
     const resultMsg = await channel.send({ embeds: [resultEmbed] });
     setTimeout(async () => {
       try { await resultMsg.delete(); } catch { /* tin nhắn đã bị xóa */ }
-    }, 10000);
+    }, 10000).unref();
 
     if (autoRestart) {
       const oldMessage = round.message;
-      setTimeout(() => this.startRound(channel, true, oldMessage), 5000);
+      setTimeout(() => this.startRound(channel, true, oldMessage), 5000).unref();
     }
   }
 }

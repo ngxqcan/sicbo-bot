@@ -200,10 +200,75 @@ async function handleAdmin(interaction) {
       '`!checkuser @user` — Xem thông tin người dùng',
       '`!resetdaily @user` — Reset daily reward',
       '`!setresult tai|xiu|triple|random` — Can thiệp kết quả',
+      '`!settle <matchId> <homeScore> <awayScore>` — Settle kết quả bóng đá',
     ].join('\n'))
     .setFooter({ text: 'Dùng prefix ! — không hiển thị trong autocomplete với người thường' })
     .setTimestamp();
   return interaction.reply({ embeds: [embed], flags: 64 });
+}
+
+// ── FOOTBALL HANDLERS ────────────────────────────────────────────────────────
+async function handleFootball(interaction) {
+  const sub = interaction.options.getSubcommand();
+  const { getUpcomingMatches } = require('../utils/footballApi');
+  const fm = require('../game/footballManager');
+
+  if (sub === 'matches') {
+    await interaction.deferReply();
+    let matches;
+    try {
+      matches = await getUpcomingMatches();
+    } catch (e) {
+      return interaction.editReply({ content: `❌ Không lấy được lịch thi đấu: ${e.message}` });
+    }
+
+    if (!matches.length) {
+      return interaction.editReply({ content: '📭 Không có trận EPL nào sắp diễn ra trong 7 ngày tới.' });
+    }
+
+    // Hiện từng trận với nút cược
+    await interaction.editReply({ content: `⚽ **${matches.length} trận EPL sắp diễn ra — bấm nút để cược:**` });
+
+    for (const m of matches) {
+      const { embed, buttons } = fm.openMatch(m);
+      await interaction.followUp({ embeds: [embed], components: buttons });
+    }
+    return;
+  }
+
+  if (sub === 'mybets') {
+    const bets = db.prepare(`
+      SELECT fb.*, fm.home_team, fm.away_team, fm.match_date, fm.status, fm.home_score, fm.away_score
+      FROM football_bets fb
+      JOIN football_matches fm ON fb.match_id = fm.match_id
+      WHERE fb.user_id = ?
+      ORDER BY fb.created_at DESC
+      LIMIT 10
+    `).all(interaction.user.id);
+
+    if (!bets.length) {
+      return interaction.reply({ content: '📭 Bạn chưa có cược bóng đá nào.', ephemeral: true });
+    }
+
+    const { BET_LABEL } = fm;
+    const lines = bets.map(b => {
+      const date = new Date(b.match_date * 1000).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+      if (b.settled) {
+        const icon = b.won ? '✅' : '❌';
+        const result = b.won ? `+${(b.payout - b.amount).toLocaleString()}` : `-${b.amount.toLocaleString()}`;
+        return `${icon} **${b.home_team} vs ${b.away_team}** (${date})\n   ${BET_LABEL[b.pick]} · ${b.amount.toLocaleString()} coins → **${result}**`;
+      } else {
+        return `⏳ **${b.home_team} vs ${b.away_team}** (${date})\n   ${BET_LABEL[b.pick]} · ${b.amount.toLocaleString()} coins · x${b.odds}`;
+      }
+    }).join('\n\n');
+
+    const embed = new EmbedBuilder()
+      .setColor(0x3a7d44)
+      .setTitle('⚽ Cược Bóng Đá Của Bạn')
+      .setDescription(lines)
+      .setTimestamp();
+    return interaction.reply({ embeds: [embed], ephemeral: true });
+  }
 }
 
 // ── PREFIX COMMANDS (!lệnh) — chỉ admin thấy và dùng ──────────────────────
@@ -309,6 +374,19 @@ async function handlePrefixAdmin(message) {
     const names = { TAI: '🔴 Tài', XIU: '🔵 Xỉu', TRIPLE: '⭐ Triple' };
     return message.reply(`🎯 Ván tiếp theo sẽ ra: **${names[val]}**`);
   }
+
+  // !settle <matchId> <homeScore> <awayScore>
+  if (cmd === 'settle') {
+    const matchId   = args[1];
+    const homeScore = parseInt(args[2]);
+    const awayScore = parseInt(args[3]);
+    if (!matchId || isNaN(homeScore) || isNaN(awayScore))
+      return message.reply('❌ Dùng: `!settle <matchId> <homeScore> <awayScore>`\nVD: `!settle 12345 2 1`');
+    const { settleMatch } = require('../game/footballManager');
+    const result = await settleMatch(matchId, homeScore, awayScore, message.channel);
+    if (result.error) return message.reply(`❌ ${result.error}`);
+    return message.reply(`✅ Đã settle trận \`${matchId}\` — ${homeScore}:${awayScore} · ${result.totalBets} cược được xử lý`);
+  }
 }
 
 module.exports = {
@@ -321,6 +399,7 @@ module.exports = {
   handleStats,
   handleGive,
   handleAdmin,
+  handleFootball,
   handlePrefixAdmin,
   autoChannels,
 };

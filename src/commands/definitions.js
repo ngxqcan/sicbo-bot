@@ -50,4 +50,17 @@ module.exports = [
     .setName('admin')
     .setDescription('🔐 Admin panel')
     .setDefaultMemberPermissions(0),
+
+  // /football — cược bóng đá EPL
+  new SlashCommandBuilder()
+    .setName('football')
+    .setDescription('⚽ Cược bóng đá Premier League')
+    .addSubcommand(sub =>
+      sub.setName('matches')
+        .setDescription('Xem các trận EPL sắp diễn ra và mở cược')
+    )
+    .addSubcommand(sub =>
+      sub.setName('mybets')
+        .setDescription('Xem các cược bóng đá của bạn đang chờ kết quả')
+    ),
 ].map(cmd => cmd.toJSON());
