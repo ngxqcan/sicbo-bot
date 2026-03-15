@@ -73,3 +73,44 @@ async function getMatch(matchId) {
 }
 
 module.exports = { getUpcomingMatches, getMatch };
+
+
+// Test kết nối — gọi khi bot khởi động
+async function testConnection() {
+  return new Promise((resolve) => {
+    const options = {
+      hostname: BASE_URL,
+      path: '/v4/competitions/2021',
+      method: 'GET',
+      headers: { 'X-Auth-Token': process.env.FOOTBALL_API_KEY || '' },
+    };
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        if (res.statusCode === 200) {
+          console.log('✅ Football API: kết nối OK');
+        } else if (res.statusCode === 403) {
+          console.error('❌ Football API: key sai hoặc chưa set FOOTBALL_API_KEY');
+        } else if (res.statusCode === 429) {
+          console.error('❌ Football API: rate limit — thử lại sau');
+        } else {
+          console.error(`❌ Football API: HTTP ${res.statusCode} — ${data.slice(0, 100)}`);
+        }
+        resolve(res.statusCode);
+      });
+    });
+    req.on('error', (e) => {
+      console.error(`❌ Football API: không kết nối được — ${e.message}`);
+      resolve(null);
+    });
+    req.setTimeout(10000, () => {
+      req.destroy();
+      console.error('❌ Football API: timeout — Railway có thể đang block outbound đến api.football-data.org');
+      resolve(null);
+    });
+    req.end();
+  });
+}
+
+module.exports = { getUpcomingMatches, getMatch, testConnection };

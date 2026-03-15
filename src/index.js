@@ -38,7 +38,9 @@ client.once(Events.ClientReady, async () => {
   client.user.setActivity('🎲 Tài Xỉu | /sicbo start');
 
   // Tự động kiểm tra kết quả bóng đá mỗi 5 phút — có guard chống overlap
-  const { autoCheckResults } = require('./game/footballManager');
+  const { autoCheckResults } = require("./game/footballManager");
+  const { testConnection } = require("./utils/footballApi");
+  testConnection(); // log kết quả vào Railway logs
   let _fbChecking = false;
   setInterval(async () => {
     if (_fbChecking) return; // bỏ qua nếu lần trước chưa xong
