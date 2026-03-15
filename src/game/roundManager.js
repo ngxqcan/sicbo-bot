@@ -320,7 +320,7 @@ class RoundManager {
     let resultDesc = '';
     const { DICE_EMOJI } = require('./engine');
     // Xúc xắc to ở tiêu đề
-    const diceDisplay = dice.map(d => DICE_EMOJI[d]).join('  ');
+    const diceDisplay = dice.map(d => DICE_EMOJI[d]).join('   ');
 
     if (rollResult.isTriple) {
       resultTitle = diceDisplay;
@@ -335,7 +335,7 @@ class RoundManager {
 
     const resultEmbed = new EmbedBuilder()
       .setColor(embedColor)
-      .setTitle(`🎲 ${resultTitle}`)
+      .setTitle(resultTitle)
       .setDescription(resultDesc)
       .setThumbnail(this.client?.user?.displayAvatarURL() ?? null)
       .addFields(

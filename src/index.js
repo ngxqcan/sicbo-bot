@@ -7,7 +7,7 @@ const roundManager = require('./game/roundManager');
 const {
   handleSicboStart, handleSicboStop, handleSicboAutostart,
   handleBalance, handleDaily, handleLeaderboard, handleStats, handleGive, handleAdmin,
-  handleBank, handleFootball,
+  handleBank,
 } = require('./commands/handlers');
 
 const REQUIRED = ['DISCORD_TOKEN', 'CLIENT_ID'];
@@ -36,19 +36,6 @@ client.once(Events.ClientReady, async () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
   console.log(`🎲 Sic Bo Bot is ready! Serving ${client.guilds.cache.size} guild(s).`);
   client.user.setActivity('🎲 Tài Xỉu | /sicbo start');
-
-  // Tự động kiểm tra kết quả bóng đá mỗi 5 phút — có guard chống overlap
-  const { autoCheckResults } = require("./game/footballManager");
-  const { testConnection } = require("./utils/footballApi");
-  testConnection(); // log kết quả vào Railway logs
-  let _fbChecking = false;
-  setInterval(async () => {
-    if (_fbChecking) return; // bỏ qua nếu lần trước chưa xong
-    _fbChecking = true;
-    try { await autoCheckResults(client); }
-    catch (e) { console.error('Football auto-check error:', e.message); }
-    finally { _fbChecking = false; }
-  }, 5 * 60 * 1000).unref();
 
   // Log memory usage mỗi giờ để phát hiện leak sớm
   setInterval(() => {
@@ -121,23 +108,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return interaction.reply({ embeds: [embed], ephemeral: true });
     }
 
-    // ── Football: xem chi tiết trận (Trận 1, Trận 2...) ──────────────────
-    if (interaction.customId.startsWith('fb_view_')) {
-      const matchId = interaction.customId.slice('fb_view_'.length);
-      const fm = require('./game/footballManager');
-      await fm.viewMatch(interaction, matchId);
-      return;
-    }
 
-    // ── Football: chọn kèo (Thắng Nhà / Hòa / Thắng Khách) ──────────────
-    if (interaction.customId.startsWith('fb_bet_')) {
-      const parts   = interaction.customId.split('_'); // fb_bet_matchId_PICK
-      const pick    = parts[parts.length - 1];
-      const matchId = parts.slice(2, parts.length - 1).join('_');
-      const fm = require('./game/footballManager');
-      await fm.placeBet(interaction, matchId, pick);
-      return;
-    }
 
     // Nút cược Tài Xỉu → hiện modal
     const parts = interaction.customId.split('_');
@@ -147,15 +118,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return;
   }
 
-  // ── Football bet modal submit ───────────────────────────────────────────
-  if (interaction.isModalSubmit() && interaction.customId.startsWith('fb_submit_')) {
-    const parts   = interaction.customId.split('_'); // fb_submit_matchId_PICK
-    const pick    = parts[parts.length - 1];
-    const matchId = parts.slice(2, parts.length - 1).join('_');
-    const fm = require('./game/footballManager');
-    await fm.submitBet(interaction, matchId, pick);
-    return;
-  }
   if (interaction.isModalSubmit()) {
     const parts = interaction.customId.split('_');
     if (parts[0] !== 'betsubmit') return;
@@ -198,7 +160,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       case 'give':        await handleGive(interaction);        break;
       case 'admin':       await handleAdmin(interaction);       break;
       case 'bank':        await handleBank(interaction);        break;
-      case 'football':    await handleFootball(interaction);    break;
       default:
         await interaction.reply({ content: '❓ Lệnh không hợp lệ.', ephemeral: true });
     }
