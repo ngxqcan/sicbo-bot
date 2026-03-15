@@ -3,44 +3,73 @@
 const https = require('https');
 
 const BASE_URL = 'api.football-data.org';
-const EPL_ID = 2021; // Premier League competition ID
+const EPL_ID = 2021;
 
-function apiGet(path) {
+function apiGet(path, retries = 3) {
   return new Promise((resolve, reject) => {
-    const options = {
-      hostname: BASE_URL,
-      path,
-      method: 'GET',
-      headers: { 'X-Auth-Token': process.env.FOOTBALL_API_KEY || '' },
-    };
-    const req = https.request(options, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try { resolve(JSON.parse(data)); }
-        catch { reject(new Error('Invalid JSON response')); }
+    const attempt = (remaining) => {
+      const options = {
+        hostname: BASE_URL,
+        path,
+        method: 'GET',
+        headers: { 'X-Auth-Token': process.env.FOOTBALL_API_KEY || '' },
+      };
+      const req = https.request(options, (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(data);
+            // API trả về lỗi 429 (rate limit) hay 403 (no key)
+            if (res.statusCode === 429) {
+              return reject(new Error('Rate limit exceeded — thử lại sau 1 phút'));
+            }
+            if (res.statusCode === 403) {
+              return reject(new Error('API key không hợp lệ hoặc chưa được set'));
+            }
+            if (res.statusCode !== 200) {
+              return reject(new Error(`API error ${res.statusCode}: ${parsed.message || 'Unknown'}`));
+            }
+            resolve(parsed);
+          } catch {
+            reject(new Error('Invalid JSON response'));
+          }
+        });
       });
-    });
-    req.on('error', reject);
-    req.setTimeout(8000, () => { req.destroy(); reject(new Error('Request timeout')); });
-    req.end();
+      req.on('error', (err) => {
+        if (remaining > 1) {
+          console.warn(`Football API retry (${remaining - 1} left): ${err.message}`);
+          setTimeout(() => attempt(remaining - 1), 2000);
+        } else {
+          reject(err);
+        }
+      });
+      req.setTimeout(15000, () => {
+        req.destroy();
+        if (remaining > 1) {
+          console.warn(`Football API timeout, retrying (${remaining - 1} left)...`);
+          setTimeout(() => attempt(remaining - 1), 2000);
+        } else {
+          reject(new Error('Request timeout sau 3 lần thử'));
+        }
+      });
+      req.end();
+    };
+    attempt(retries);
   });
 }
 
-// Lấy các trận EPL sắp diễn ra trong 7 ngày tới (status=SCHEDULED/TIMED)
 async function getUpcomingMatches() {
   const now = new Date();
   const future = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
   const dateFrom = now.toISOString().slice(0, 10);
   const dateTo = future.toISOString().slice(0, 10);
   const data = await apiGet(`/v4/competitions/${EPL_ID}/matches?dateFrom=${dateFrom}&dateTo=${dateTo}&status=SCHEDULED,TIMED`);
-  return (data.matches || []).slice(0, 10); // tối đa 10 trận
+  return (data.matches || []).slice(0, 10);
 }
 
-// Lấy kết quả 1 trận theo matchId
 async function getMatch(matchId) {
-  const data = await apiGet(`/v4/matches/${matchId}`);
-  return data;
+  return apiGet(`/v4/matches/${matchId}`);
 }
 
 module.exports = { getUpcomingMatches, getMatch };
