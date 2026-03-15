@@ -291,6 +291,104 @@ async function handleBank(interaction) {
   }
 }
 
+
+// ── PREFIX COMMANDS (!lệnh) — chỉ admin dùng được ──────────────────────────
+async function handlePrefixAdmin(message) {
+  const args = message.content.slice(1).trim().split(/\s+/);
+  const cmd = args[0].toLowerCase();
+
+  async function resolveUser(arg) {
+    if (!arg) return null;
+    const id = arg.replace(/[<@!>]/g, '');
+    try { return await message.client.users.fetch(id); } catch { return null; }
+  }
+
+  if (cmd === 'addcoins') {
+    const target = await resolveUser(args[1]);
+    const amount = parseInt(args[2]);
+    if (!target || isNaN(amount) || amount <= 0)
+      return message.reply('Dung: !addcoins @user <so coins>');
+    getPlayer(target.id, target.username);
+    adjustBalance(target.id, amount);
+    const after = getPlayer(target.id, target.username);
+    return message.reply(`Da them +${amount.toLocaleString()} coins cho <@${target.id}> - So du moi: ${after.balance.toLocaleString()} coins`);
+  }
+
+  if (cmd === 'removecoins') {
+    const target = await resolveUser(args[1]);
+    const amount = parseInt(args[2]);
+    if (!target || isNaN(amount) || amount <= 0)
+      return message.reply('Dung: !removecoins @user <so coins>');
+    getPlayer(target.id, target.username);
+    const deduct = Math.min(amount, getPlayer(target.id, target.username).balance);
+    adjustBalance(target.id, -deduct);
+    const after = getPlayer(target.id, target.username);
+    return message.reply(`Da tru -${deduct.toLocaleString()} coins cua <@${target.id}> - So du moi: ${after.balance.toLocaleString()} coins`);
+  }
+
+  if (cmd === 'setcoins') {
+    const target = await resolveUser(args[1]);
+    const amount = parseInt(args[2]);
+    if (!target || isNaN(amount) || amount < 0)
+      return message.reply('Dung: !setcoins @user <so coins>');
+    getPlayer(target.id, target.username);
+    db.prepare('UPDATE players SET balance = ? WHERE user_id = ?').run(amount, target.id);
+    return message.reply(`Da set so du <@${target.id}> thanh ${amount.toLocaleString()} coins`);
+  }
+
+  if (cmd === 'resetbalance') {
+    const target = await resolveUser(args[1]);
+    if (!target) return message.reply('Dung: !resetbalance @user');
+    const startBalance = parseInt(process.env.STARTING_BALANCE || '1000');
+    getPlayer(target.id, target.username);
+    db.prepare('UPDATE players SET balance = ? WHERE user_id = ?').run(startBalance, target.id);
+    return message.reply(`Da reset so du <@${target.id}> ve ${startBalance.toLocaleString()} coins`);
+  }
+
+  if (cmd === 'checkuser') {
+    const target = await resolveUser(args[1]);
+    if (!target) return message.reply('Dung: !checkuser @user');
+    const player = getPlayer(target.id, target.username);
+    if (!player) return message.reply('Nguoi dung chua choi bao gio.');
+    const net = player.total_won - player.total_lost;
+    const winRate = (player.total_won + player.total_lost) > 0
+      ? ((player.total_won / (player.total_won + player.total_lost)) * 100).toFixed(1) : '0.0';
+    const embed = new EmbedBuilder()
+      .setColor(0x5865F2)
+      .setTitle('Thong Tin: ' + target.username)
+      .addFields(
+        { name: 'So du', value: player.balance.toLocaleString() + ' coins', inline: true },
+        { name: 'So van', value: String(player.games_played), inline: true },
+        { name: 'Win Rate', value: winRate + '%', inline: true },
+        { name: 'Tong thang', value: player.total_won.toLocaleString(), inline: true },
+        { name: 'Tong thua', value: player.total_lost.toLocaleString(), inline: true },
+        { name: 'Net', value: (net >= 0 ? '+' : '') + net.toLocaleString(), inline: true },
+      )
+      .setFooter({ text: 'ID: ' + target.id });
+    return message.reply({ embeds: [embed] });
+  }
+
+  if (cmd === 'resetdaily') {
+    const target = await resolveUser(args[1]);
+    if (!target) return message.reply('Dung: !resetdaily @user');
+    getPlayer(target.id, target.username);
+    db.prepare('UPDATE players SET last_daily = NULL WHERE user_id = ?').run(target.id);
+    return message.reply('Da reset daily cho <@' + target.id + '>');
+  }
+
+  if (cmd === 'setresult') {
+    const val = (args[1] || '').toUpperCase();
+    if (!['TAI', 'XIU', 'TRIPLE', 'RANDOM'].includes(val))
+      return message.reply('Dung: !setresult tai | xiu | triple | random');
+    if (val === 'RANDOM') {
+      roundManager.forceResult = null;
+      return message.reply('Da bo can thiep - van tiep theo ngau nhien');
+    }
+    roundManager.forceResult = val;
+    return message.reply('Van tiep theo se ra: ' + val);
+  }
+}
+
 module.exports = {
   handleSicboStart, handleSicboStop, handleSicboAutostart,
   handleBalance, handleDaily, handleLeaderboard, handleStats, handleGive,
