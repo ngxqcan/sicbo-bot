@@ -13,7 +13,9 @@ const db = new Database(path.join(DATA_DIR, 'sicbo.db'));
 
 // Enable WAL mode for better performance
 db.pragma('journal_mode = WAL');
+db.pragma('synchronous = NORMAL'); // an toàn + nhanh hơn FULL
 db.pragma('foreign_keys = ON');
+db.pragma('cache_size = -8000'); // 8MB page cache
 
 // Initialize tables
 db.exec(`
@@ -161,16 +163,16 @@ function getLeaderboard() {
   return stmts.getLeaderboard.all();
 }
 
+// Prepared statement cho saveRound — tạo 1 lần, dùng mãi
+const _insertRound = db.prepare(
+  'INSERT OR IGNORE INTO round_history (round_id, dice1, dice2, dice3, total, result) VALUES (?, ?, ?, ?, ?, ?)'
+);
+
 function saveRound(roundId, dice) {
   const [d1, d2, d3] = dice;
   const total = d1 + d2 + d3;
   const result = (d1 === d2 && d2 === d3) ? 'TRIPLE' : total >= 11 ? 'TAI' : 'XIU';
-  try {
-    db.prepare(`
-      INSERT OR IGNORE INTO round_history (round_id, dice1, dice2, dice3, total, result)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(roundId, d1, d2, d3, total, result);
-  } catch (e) { /* non-critical */ }
+  try { _insertRound.run(roundId, d1, d2, d3, total, result); } catch { /* non-critical */ }
 }
 
 function getRecentRounds(limit = 10) {
@@ -216,21 +218,26 @@ function bankWithdraw(userId, amount) {
   return { success: true };
 }
 
+// Prepared stmts cho interest — tạo 1 lần ngoài function
+const _getActiveSavings = db.prepare('SELECT * FROM bank_accounts WHERE savings > 0');
+const _applyInterestStmt = db.prepare(
+  'UPDATE bank_accounts SET savings = savings + ?, last_interest = last_interest + ? WHERE user_id = ?'
+);
+
 // Tính và cộng lãi suất cho tất cả tài khoản
 function applyInterest() {
   const now  = Math.floor(Date.now() / 1000);
-  const accs = db.prepare('SELECT * FROM bank_accounts WHERE savings > 0').all();
+  const accs = _getActiveSavings.all();
   let   total = 0;
   const apply = db.transaction(() => {
     for (const acc of accs) {
       const hoursElapsed = (now - acc.last_interest) / 3600;
       if (hoursElapsed < 1) continue;
-      const fullHours  = Math.floor(hoursElapsed);
-      let   interest   = Math.floor(acc.savings * INTEREST_RATE * fullHours);
+      const fullHours = Math.floor(hoursElapsed);
+      let interest = Math.floor(acc.savings * INTEREST_RATE * fullHours);
       if (INTEREST_CAP > 0) interest = Math.min(interest, INTEREST_CAP);
       if (interest <= 0) continue;
-      db.prepare('UPDATE bank_accounts SET savings = savings + ?, last_interest = last_interest + ? WHERE user_id = ?')
-        .run(interest, fullHours * 3600, acc.user_id);
+      _applyInterestStmt.run(interest, fullHours * 3600, acc.user_id);
       total += interest;
     }
   });

@@ -15,7 +15,8 @@ setInterval(() => {
     const cutoff = Math.floor(Date.now() / 1000) - keepDays * 86400;
     db.prepare('DELETE FROM bet_history WHERE created_at < ?').run(cutoff);
     db.prepare('DELETE FROM round_history WHERE created_at < ?').run(cutoff);
-    db.pragma('wal_checkpoint(TRUNCATE)'); // thu hồi file WAL
+    db.pragma('wal_checkpoint(TRUNCATE)');
+    db.pragma('optimize'); // cập nhật query planner stats
   } catch { /* non-critical */ }
 }, 60 * 60 * 1000).unref();
 

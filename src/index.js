@@ -37,9 +37,22 @@ client.once(Events.ClientReady, async () => {
   console.log(`🎲 Sic Bo Bot is ready! Serving ${client.guilds.cache.size} guild(s).`);
   client.user.setActivity('🎲 Tài Xỉu | /sicbo start');
 
-  // Tự động kiểm tra kết quả bóng đá mỗi 5 phút
+  // Tự động kiểm tra kết quả bóng đá mỗi 5 phút — có guard chống overlap
   const { autoCheckResults } = require('./game/footballManager');
-  setInterval(() => autoCheckResults(client), 5 * 60 * 1000).unref();
+  let _fbChecking = false;
+  setInterval(async () => {
+    if (_fbChecking) return; // bỏ qua nếu lần trước chưa xong
+    _fbChecking = true;
+    try { await autoCheckResults(client); }
+    catch (e) { console.error('Football auto-check error:', e.message); }
+    finally { _fbChecking = false; }
+  }, 5 * 60 * 1000).unref();
+
+  // Log memory usage mỗi giờ để phát hiện leak sớm
+  setInterval(() => {
+    const mb = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(1);
+    console.log(`📊 Memory: ${mb} MB heap used`);
+  }, 60 * 60 * 1000).unref();
 
   // Tự động tính lãi suất ngân hàng mỗi giờ
   const { applyInterest, getAutoChannels } = require('./utils/database');
@@ -215,12 +228,5 @@ process.on('unhandledRejection', (err) => console.error('Unhandled rejection:', 
 process.on('SIGINT', () => { client.destroy(); process.exit(0); });
 process.on('SIGTERM', () => { client.destroy(); process.exit(0); });
 
-// Tự restart mỗi 6 tiếng để tránh lag tích lũy
-const RESTART_INTERVAL = parseInt(process.env.RESTART_INTERVAL_HOURS || '6') * 60 * 60 * 1000;
-setTimeout(() => {
-  console.log('🔄 Scheduled restart — see you in a sec!');
-  client.destroy();
-  process.exit(0);
-}, RESTART_INTERVAL).unref();
 
 client.login(process.env.DISCORD_TOKEN);
